@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KAST — Kaspa Anonymous Sealed Token</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --red: #f85149;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+  .container { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
+  h1 { font-size: 2.4rem; margin-bottom: 0.3rem; }
+  h1 span { color: var(--accent); }
+  .tagline { color: var(--text-muted); font-size: 1.1rem; margin-bottom: 0.5rem; }
+  .quote { color: var(--accent2); font-style: italic; margin-bottom: 2rem; font-size: 0.95rem; }
+  h2 {
+    font-size: 1.5rem;
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 { font-size: 1.15rem; margin-top: 1.5rem; margin-bottom: 0.7rem; color: var(--accent); }
+  p { margin-bottom: 1rem; }
+  strong { color: #fff; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; font-size: 0.9rem; }
+  th, td { padding: 0.6rem 0.8rem; border: 1px solid var(--border); text-align: left; }
+  th { background: var(--surface); color: var(--accent); font-weight: 600; }
+  td { background: var(--bg); }
+  pre {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    overflow-x: auto;
+    margin-bottom: 1.5rem;
+    font-size: 0.85rem;
+    line-height: 1.5;
+  }
+  code { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-right: 0.4rem;
+  }
+  .badge-green { background: #238636; color: #fff; }
+  .badge-yellow { background: #9e6a03; color: #fff; }
+  .badge-red { background: #da3633; color: #fff; }
+  .badge-blue { background: #1f6feb; color: #fff; }
+  .nav { display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
+  .nav a {
+    padding: 0.4rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    transition: border-color 0.2s;
+  }
+  .nav a:hover { border-color: var(--accent); text-decoration: none; }
+  .lang { float: right; font-size: 0.85rem; }
+  .phase {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.2rem;
+    margin-bottom: 1rem;
+  }
+  .phase-title { color: var(--accent2); font-weight: 700; margin-bottom: 0.5rem; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+  .footer { color: var(--text-muted); font-size: 0.8rem; margin-top: 3rem; text-align: center; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<div class="lang"><a href="#ja">日本語</a> | <a href="#en">English</a></div>
+
+<h1><span>K</span>AST</h1>
+<div class="tagline">Kaspa Anonymous Sealed Token — A UTXO Physical Vote Protocol on Kaspa</div>
+<div class="quote">"Cast your vote. Burn the proof. Keep the truth."</div>
+
+<div class="nav">
+  <a href="https://github.com/RossKU/KAST">GitHub</a>
+  <a href="https://github.com/RossKU/KAST/blob/main/README.md">Spec (JA)</a>
+  <a href="https://github.com/RossKU/KAST/blob/main/README_EN.md">Spec (EN)</a>
+  <a href="https://github.com/kaspanet/rusty-kaspa/tree/tn12">Kaspa TN12</a>
+</div>
+
+<!-- ==================== ENGLISH ==================== -->
+<section id="en">
+
+<h2>Motivation</h2>
+<p>The goal of KAST is not to reinvent elections — it is to make the existing system <strong>tamper-proof</strong> by anchoring it to a blockchain.</p>
+<p>Today's voting infrastructure already works: physical ballots, sealed envelopes, in-person ID verification, and public tallying. What it lacks is <strong>cryptographic guarantees</strong> against fraud, manipulation, and opacity. KAST preserves the familiar physical voting experience while embedding every critical step into Kaspa's L1 consensus.</p>
+<p><strong>Covenant++ proves the concept. vProgs delivers the system.</strong></p>
+
+<h2>Core Principles</h2>
+<table>
+<tr><th>Principle</th><th>Mechanism</th></tr>
+<tr><td>One person, one vote</td><td>UTXO double-spend prevention = double-vote prevention</td></tr>
+<tr><td>Ballot secrecy</td><td>ZK proof severs the link between voter and vote content</td></tr>
+<tr><td>Proof of participation</td><td>Original token UTXO's spent status verifiable on-chain</td></tr>
+<tr><td>Non-reissuable</td><td>UTXO destruction + mint authority burn</td></tr>
+<tr><td>Public tallying</td><td>UTXO count at candidate addresses (anyone can verify)</td></tr>
+<tr><td>Tamper-proof</td><td>Kaspa L1 consensus (PoW + DAG)</td></tr>
+</table>
+
+<h2>Protocol Flow</h2>
+
+<div class="phase">
+<div class="phase-title">Phase 0 — Election Setup</div>
+Election commission builds a Merkle tree from the voter registry (leaf = voter's public key). Issues an Election Genesis TX committing the Merkle root on-chain.
+</div>
+
+<div class="phase">
+<div class="phase-title">Phase 1 — Token Minting + Physical Delivery</div>
+Commission mints N vote token UTXOs via multisig. Each voter's private key is QR-encoded and mailed in a sealed envelope (<strong>QR1</strong>). After final mint, the Master UTXO is burned — no further minting is possible.
+</div>
+
+<div class="phase">
+<div class="phase-title">Phase 2 — Anonymization</div>
+Voter brings QR1 to polling station → ID verification → station terminal broadcasts Anonymize TX with a ZK proof (RISC0/Groth16) proving Merkle membership without revealing which voter. A new anonymous token UTXO is created and printed as <strong>QR2</strong>. The link between voter identity and anonymous token is <strong>cryptographically severed</strong>.
+</div>
+
+<div class="phase">
+<div class="phase-title">Phase 3 — Voting</div>
+Voter scans QR2 → selects candidate via touch interface → terminal sends Vote TX to the candidate's collection address. Covenant script enforces: valid covenant chain, single output, output in candidate list, value preserved. QR2's UTXO is destroyed.
+</div>
+
+<div class="phase">
+<div class="phase-title">Phase 4 — Tallying</div>
+UTXO count at each candidate's collection address = vote count. Publicly verifiable on-chain by anyone. No central server or administrator.
+</div>
+
+<div class="phase">
+<div class="phase-title">Phase 5 — Verification</div>
+Voter's original token UTXO is spent → proves participation. Anonymous token → candidate link is untraceable → ballot secrecy preserved.
+</div>
+
+<h2>QR Token Lifecycle</h2>
+<table>
+<tr><th>Token</th><th>Created</th><th>Used</th><th>After Use</th></tr>
+<tr><td><strong>QR1</strong> (mailed)</td><td>Mint TX</td><td>Anonymize TX at station</td><td>UTXO destroyed. Non-reissuable (Master burned)</td></tr>
+<tr><td><strong>QR2</strong> (printed)</td><td>Anonymize TX</td><td>Vote TX at station</td><td>UTXO destroyed. Cannot re-trigger (QR1 gone)</td></tr>
+</table>
+
+<h2>Security</h2>
+<table>
+<tr><th>Attack Vector</th><th>Countermeasure</th></tr>
+<tr><td><span class="badge badge-red">Timing Analysis</span></td><td>Time-window batching via OpTxInputDaaScore; high BPS makes per-TX linking difficult; terminal batch broadcast</td></tr>
+<tr><td><span class="badge badge-red">Commission Fraud</span></td><td>Master UTXO burn after minting; public on-chain audit; multisig requirement; covenant output count constraint</td></tr>
+<tr><td><span class="badge badge-yellow">QR1 Theft</span></td><td>2-of-2 multisig (voter key + terminal key); in-person ID check required</td></tr>
+<tr><td><span class="badge badge-yellow">Coercion</span></td><td>Anonymous key generated and destroyed in TEE; voter never knows the key; irreversible link severance</td></tr>
+<tr><td><span class="badge badge-yellow">Terminal Tampering</span></td><td>Open-source software; multi-terminal verification; confirmation screen before broadcast</td></tr>
+<tr><td><span class="badge badge-blue">Sybil Attack</span></td><td>Public registry audit; national ID integration; pre-election Merkle root publication</td></tr>
+<tr><td><span class="badge badge-blue">51% Attack</span></td><td>Kaspa DAG resilience; short voting window; finality confirmation; physical log cross-reference</td></tr>
+<tr><td><span class="badge badge-blue">Chain Analysis</span></td><td>Uniform TX structure (value, fee, script size); all tokens 1 sompi; identical script structure</td></tr>
+</table>
+
+<h2>Why Kaspa</h2>
+<table>
+<tr><th>Dimension</th><th>Ethereum</th><th>Bitcoin</th><th>Kaspa Covenant++</th></tr>
+<tr><td>One-person-one-vote</td><td>Manual (mapping + require)</td><td>Difficult</td><td><strong>Native UTXO guarantee</strong></td></tr>
+<tr><td>Double-vote prevention</td><td>Contract bug risk</td><td>○</td><td><strong>Consensus-level</strong></td></tr>
+<tr><td>Ballot secrecy</td><td>External tools</td><td>Difficult</td><td><strong>L1 ZK precompile</strong></td></tr>
+<tr><td>Tally transparency</td><td>Contract trust</td><td>○</td><td><strong>UTXO count</strong></td></tr>
+<tr><td>Throughput</td><td>~15 TPS</td><td>~7 TPS</td><td><strong>10-100 BPS</strong></td></tr>
+<tr><td>Rule enforcement</td><td>EVM (broad surface)</td><td>Limited</td><td><strong>Covenant (minimal surface)</strong></td></tr>
+</table>
+
+<h2>Tech Stack</h2>
+<table>
+<tr><th>Component</th><th>Technology</th></tr>
+<tr><td>L1 Blockchain</td><td>Kaspa (PoW + blockDAG, Covenant++ HF)</td></tr>
+<tr><td>ZK Proof Generation</td><td>RISC0 (Rust) / Groth16 (ark-bn254)</td></tr>
+<tr><td>ZK Proof Verification</td><td>OpZkPrecompile (0xa6) on Kaspa L1</td></tr>
+<tr><td>Merkle Tree</td><td>Blake2b hash-based</td></tr>
+<tr><td>Token Management</td><td>Covenant ID + UTXO</td></tr>
+<tr><td>Physical Delivery</td><td>QR code in sealed envelope</td></tr>
+<tr><td>Voting Terminal</td><td>Open-source, TEE-enabled</td></tr>
+</table>
+
+</section>
+
+<hr>
+
+<!-- ==================== JAPANESE ==================== -->
+<section id="ja">
+
+<h2>モチベーション</h2>
+<p>KAST の目的は選挙を再発明することではない。既存の選挙システムをブロックチェーンに固定し、<strong>改竄不可能にすること</strong>である。</p>
+<p>今日の投票インフラは既に機能している。紙の投票用紙、封筒、対面での本人確認、公開集計。欠けているのは、不正・改竄・不透明性に対する<strong>暗号学的保証</strong>だけだ。</p>
+<p><strong>Covenant++ でコンセプトを証明し、vProgs でシステムを届ける。</strong></p>
+
+<h2>基本原則</h2>
+<table>
+<tr><th>原則</th><th>実現手段</th></tr>
+<tr><td>1人1票</td><td>UTXO の二重支払い防止 = 二重投票防止</td></tr>
+<tr><td>投票の秘密</td><td>ZK proof によるリンク切断（投票者 ↔ 投票内容）</td></tr>
+<tr><td>投票参加の証明</td><td>元トークン UTXO の spent 状態をオンチェーンで確認可能</td></tr>
+<tr><td>再発行不可</td><td>UTXO 消滅 + Mint 権限の burn</td></tr>
+<tr><td>公開集計</td><td>候補者アドレスの UTXO カウント（誰でも検証可能）</td></tr>
+<tr><td>改竄不可能</td><td>Kaspa L1 コンセンサス（PoW + DAG）</td></tr>
+</table>
+
+<h2>プロトコルフロー</h2>
+
+<div class="phase">
+<div class="phase-title">Phase 0 — 選挙セットアップ</div>
+選挙管理委員会が有権者名簿から Merkle tree を構築（リーフ = 各有権者の公開鍵）。Election Genesis TX を発行し、Merkle root をオンチェーンにコミット。
+</div>
+
+<div class="phase">
+<div class="phase-title">Phase 1 — トークン発行 + 物理配送</div>
+委員会がマルチシグで N 人分の投票トークン UTXO を発行。各投票者の秘密鍵を QR コード化し、封筒で郵送（<strong>QR1</strong>）。最終 Mint TX で Master UTXO を burn — 以降の発行は不可能。
+</div>
+
+<div class="phase">
+<div class="phase-title">Phase 2 — 匿名化</div>
+投票者が QR1 を投票所に持参 → 本人確認 → 端末が匿名化 TX を送信。ZK proof（RISC0/Groth16）で Merkle membership を証明（どの投票者かは非公開）。新しい匿名トークン UTXO を <strong>QR2</strong> として印刷。投票者と匿名トークンのリンクは<strong>暗号学的に切断</strong>。
+</div>
+
+<div class="phase">
+<div class="phase-title">Phase 3 — 投票</div>
+投票者が QR2 をスキャン → タッチで候補者選択 → 端末が Vote TX を送信。Covenant スクリプトが強制: 有効な covenant chain、出力 1 つ、候補者リスト内、value 保存。QR2 の UTXO は消滅。
+</div>
+
+<div class="phase">
+<div class="phase-title">Phase 4 — 集計</div>
+各候補者の集票アドレスの UTXO 数 = 得票数。オンチェーンで誰でも検証可能。中央サーバー不要。
+</div>
+
+<div class="phase">
+<div class="phase-title">Phase 5 — 検証</div>
+元トークン UTXO が spent → 投票参加を証明。匿名トークン → 候補者のリンクは追跡不可能 → 投票の秘密を保持。
+</div>
+
+<h2>セキュリティ</h2>
+<table>
+<tr><th>攻撃ベクトル</th><th>対策</th></tr>
+<tr><td><span class="badge badge-red">タイミング分析</span></td><td>OpTxInputDaaScore で時間窓バッチング、高 BPS で個別リンク困難、端末バッチ送信</td></tr>
+<tr><td><span class="badge badge-red">委員会の不正</span></td><td>Master UTXO の burn、オンチェーン公開監査、マルチシグ要求、Covenant 出力数制約</td></tr>
+<tr><td><span class="badge badge-yellow">QR1 盗難</span></td><td>2-of-2 マルチシグ（投票者鍵 + 端末鍵）、対面本人確認必須</td></tr>
+<tr><td><span class="badge badge-yellow">脅迫・買収</span></td><td>匿名鍵を TEE で生成・即破棄、投票者は鍵を知らない、リンク切断は不可逆</td></tr>
+<tr><td><span class="badge badge-yellow">端末改竄</span></td><td>オープンソース、多重端末検証、送信前確認画面</td></tr>
+<tr><td><span class="badge badge-blue">Sybil 攻撃</span></td><td>名簿公開監査、マイナンバー連携、事前 Merkle root 公開</td></tr>
+<tr><td><span class="badge badge-blue">51% 攻撃</span></td><td>Kaspa DAG 耐性、短い投票期間、ファイナリティ確認、物理ログ照合</td></tr>
+<tr><td><span class="badge badge-blue">チェーン分析</span></td><td>均一な TX 構造（value, 手数料, スクリプトサイズ）、全トークン 1 sompi、統一スクリプト</td></tr>
+</table>
+
+</section>
+
+<hr>
+
+<div class="footer">
+  KAST — Kaspa Anonymous Sealed Token<br>
+  <a href="https://github.com/RossKU/KAST">github.com/RossKU/KAST</a><br>
+  License: ISC
+</div>
+
+</div>
+</body>
+</html>
