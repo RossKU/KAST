@@ -4,22 +4,6 @@
 >
 > *"Cast your vote. Burn the proof. Keep the truth."*
 
-## Motivation
-
-The goal of KAST is not to reinvent elections — it is to make the existing system tamper-proof by anchoring it to a blockchain.
-
-Today's voting infrastructure already works: physical ballots, sealed envelopes, in-person ID verification, and public tallying. What it lacks is **cryptographic guarantees** against fraud, manipulation, and opacity. KAST preserves the familiar physical voting experience while embedding every critical step — token issuance, anonymization, casting, and counting — into Kaspa's L1 consensus, making each one immutable and publicly verifiable.
-
-### Implementation Scope
-
-With the **Covenant++ hard fork (TN12)**, a limited but functional subset of KAST is achievable: one-time vote tokens via UTXO, ZK-based eligibility proofs, covenant-enforced candidate constraints, and transparent on-chain tallying. This is sufficient for pilot deployments and proof-of-concept elections.
-
-However, for production-grade national elections — requiring encrypted tallying, liquid delegation, cross-district composability, and full receipt-freeness — **waiting for vProgs is the prudent path**. vProgs will bring CairoVM execution, global state management via Computation DAG, and Proof Stitching, enabling the cryptographic sophistication that large-scale elections demand without compromising Kaspa's L1 security model.
-
-**In short: Covenant++ proves the concept. vProgs delivers the system.**
-
----
-
 ## 概要
 
 KAST は、Kaspa の Covenant++ ハードフォーク（TN12）の機能を活用した、物理・デジタルハイブリッド型の電子投票プロトコルである。
