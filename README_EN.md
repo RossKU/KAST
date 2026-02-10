@@ -332,6 +332,78 @@ Example: Voter A anonymizes at 14:32:01, votes for Candidate X at 14:32:03
 | Central server | Not required | Not required | **Not required** |
 | Rule enforcement | EVM (broad attack surface) | Limited | **Covenant (minimal attack surface)** |
 
+### Comparison with Other ZK / Privacy Chains
+
+Other L1s are viable candidates for voting systems. The following is an honest comparison against KAST's requirements.
+
+| | Kaspa (Covenant++ / vProgs) | Aztec (Ethereum L2) | Aleo | Cardano (eUTXO) |
+|---|---|---|---|---|
+| Consensus | **PoW (strongest censorship resistance)** | PoS (Ethereum) | PoS | PoS |
+| Data model | **UTXO** | Notes (UTXO-like) | Records (UTXO-like) | **eUTXO** |
+| Privacy | Via ZK proof | **Native (all TXs encrypted)** | **Native** | Via ZK proof |
+| L1 ZK verification | **Yes (Groth16 / RISC0)** | **Yes** | **Yes** | Limited |
+| L1 programmability | Limited (stack-based) | High (Noir) | High (Leo) | High (Plutus) |
+| Throughput | **10,000+ TPS (at 100 BPS)** | Ethereum-dependent | Low | Low |
+
+#### Privacy: Aztec and Aleo are superior
+
+Aztec and Aleo embed privacy at the protocol level into every transaction. This means voter anonymity is guaranteed automatically, without the explicit anonymization step (Phase 2) that KAST requires. On Kaspa, anonymization must be explicitly implemented via ZK proofs and UTXO transitions.
+
+#### Programmability: Kaspa L1 is limited, but sufficient for KAST
+
+Kaspa's L1 script is an extension of Bitcoin Script and is not Turing-complete. Loops, dynamic arrays, and recursion are unavailable. Aztec (Noir), Aleo (Leo), and Cardano (Plutus) offer expressiveness close to general-purpose programming languages.
+
+However, every piece of logic KAST requires can be expressed within the L1 script's capabilities:
+
+- Merkle membership verification → `OpZkPrecompile` verifies ZK proof
+- 1 input → 1 output constraint → `OpCovOutCount` enforces
+- Output destination in candidate list → `OpTxOutputSpk` verifies
+- Value preservation → `OpTxOutputAmount` verifies
+- Time window constraint → `OpTxInputDaaScore` enforces
+
+More complex logic such as encrypted tallying and liquid delegation will be addressed by vProgs (CairoVM L2) in the future.
+
+#### vProgs (L2) Security: Based Rollup Design
+
+vProgs adopts a "Based Rollup" design, which differs fundamentally from typical L2s in its extreme dependence on L1:
+
+| Role | Typical L2 | Kaspa vProgs |
+|---|---|---|
+| Sequencing (TX ordering) | Own sequencer (censorship risk) | **Kaspa L1 handles it (PoW-protected)** |
+| Data availability | Own or external DA (hiding risk) | **Kaspa L1 holds all data** |
+| Settlement (validity verification) | Fraud proofs or ZK proofs | **ZK proofs verified by L1** |
+| Execution | On L2 | **Off-chain (CairoVM)** |
+
+The only role L2 assumes independently is execution. Sequencing, data availability, and settlement are all delegated to L1's PoW consensus. Attacking vProgs requires either "breaking ZK proof mathematics" or "breaking Kaspa L1's PoW" — neither of which is practically feasible.
+
+#### Censorship Resistance: The most critical requirement for elections
+
+Elections are a use case that directly confronts state power. While PoS chains are adequate for DeFi or NFTs, voting systems face a unique threat: governments have a direct incentive to censor vote transactions.
+
+- **PoW**: Miners are anonymous and globally distributed. Structurally difficult to compel them to reject specific transactions.
+- **PoS**: Validators are known and identifiable by their stake. Theoretically possible for a government to pressure validators into rejecting specific transactions.
+
+For voting systems, PoW censorship resistance is not a "nice-to-have" — it is a "fatal if absent" requirement.
+
+#### Throughput: 10,000+ TPS covers elections worldwide
+
+Kaspa achieves 10,000+ TPS at 100 BPS. The following estimates show the TPS required for national elections in major countries:
+
+| Country | Voters | Voting hours | Required TPS | Load on 10,000 TPS |
+|---|---|---|---|---|
+| Japan | 55 million | 13 hours | ~2,350 | 23% |
+| United States | 144 million | 13 hours | ~6,150 | 62% |
+| EU (combined) | 185 million | 13 hours | ~7,900 | 79% |
+| India | 620 million | Spread over multiple days | Distributed | — |
+
+KAST requires 2 TXs per voter (anonymization + voting). Japan's national election can be processed at roughly 23% of Kaspa's capacity, with ample headroom even under peak load conditions.
+
+#### Conclusion: Why Kaspa
+
+Aztec and Aleo are superior in privacy alone, and Cardano and Ethereum surpass Kaspa in L1 programmability. However, **no other chain combines PoW censorship resistance + UTXO model + L1 ZK verification + 10,000+ TPS**.
+
+Censorship resistance is the highest-priority requirement for election systems, and PoS chains cannot match PoW on this front. Kaspa was not designed for voting, but it possesses the most suitable combination of properties for building a voting system.
+
 ### Opcodes Used
 
 | Category | Opcode | Code | Purpose |
