@@ -1,0 +1,182 @@
+{
+  "contract_name": "KASTTally",
+  "script": [
+    0,
+    121,
+    32,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    21,
+    172,
+    105,
+    3,
+    64,
+    75,
+    76,
+    176,
+    0,
+    194,
+    185,
+    190,
+    162,
+    105,
+    117,
+    81
+  ],
+  "ast": {
+    "name": "KASTTally",
+    "params": [
+      {
+        "type_name": "pubkey",
+        "name": "candidatePk"
+      },
+      {
+        "type_name": "pubkey",
+        "name": "electionAuthority"
+      },
+      {
+        "type_name": "int",
+        "name": "electionEnd"
+      }
+    ],
+    "constants": {
+      "TOKEN_VAL": {
+        "kind": "int",
+        "data": 1
+      }
+    },
+    "functions": [
+      {
+        "name": "release",
+        "params": [
+          {
+            "type_name": "sig",
+            "name": "authSig"
+          }
+        ],
+        "entrypoint": true,
+        "return_types": [],
+        "body": [
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "call",
+                "data": {
+                  "name": "checkSig",
+                  "args": [
+                    {
+                      "kind": "identifier",
+                      "data": "authSig"
+                    },
+                    {
+                      "kind": "identifier",
+                      "data": "electionAuthority"
+                    }
+                  ]
+                }
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "time_op",
+            "data": {
+              "tx_var": "tx_time",
+              "expr": {
+                "kind": "identifier",
+                "data": "electionEnd"
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "int",
+              "modifiers": [],
+              "name": "inputVal",
+              "expr": {
+                "kind": "introspection",
+                "data": {
+                  "kind": "input_value",
+                  "index": {
+                    "kind": "nullary",
+                    "data": "active_input_index"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "binary",
+                "data": {
+                  "op": "ge",
+                  "left": {
+                    "kind": "introspection",
+                    "data": {
+                      "kind": "output_value",
+                      "index": {
+                        "kind": "int",
+                        "data": 0
+                      }
+                    }
+                  },
+                  "right": {
+                    "kind": "identifier",
+                    "data": "inputVal"
+                  }
+                }
+              },
+              "message": null
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "abi": [
+    {
+      "name": "release",
+      "inputs": [
+        {
+          "name": "authSig",
+          "type_name": "sig"
+        }
+      ]
+    }
+  ],
+  "without_selector": true
+}

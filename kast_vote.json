@@ -1,0 +1,498 @@
+{
+  "contract_name": "KASTVote",
+  "script": [
+    81,
+    121,
+    81,
+    121,
+    172,
+    105,
+    2,
+    44,
+    1,
+    177,
+    180,
+    81,
+    156,
+    105,
+    0,
+    194,
+    81,
+    162,
+    105,
+    0,
+    195,
+    32,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    3,
+    0,
+    0,
+    32,
+    124,
+    126,
+    1,
+    172,
+    126,
+    135,
+    0,
+    195,
+    32,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    3,
+    0,
+    0,
+    32,
+    124,
+    126,
+    1,
+    172,
+    126,
+    135,
+    155,
+    0,
+    195,
+    32,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    3,
+    0,
+    0,
+    32,
+    124,
+    126,
+    1,
+    172,
+    126,
+    135,
+    155,
+    105,
+    185,
+    207,
+    210,
+    81,
+    156,
+    105,
+    117,
+    117,
+    81
+  ],
+  "ast": {
+    "name": "KASTVote",
+    "params": [
+      {
+        "type_name": "pubkey",
+        "name": "candidateA"
+      },
+      {
+        "type_name": "pubkey",
+        "name": "candidateB"
+      },
+      {
+        "type_name": "pubkey",
+        "name": "candidateC"
+      }
+    ],
+    "constants": {
+      "MIN_AGE": {
+        "kind": "int",
+        "data": 300
+      },
+      "TOKEN_VAL": {
+        "kind": "int",
+        "data": 1
+      }
+    },
+    "functions": [
+      {
+        "name": "vote",
+        "params": [
+          {
+            "type_name": "sig",
+            "name": "anonSig"
+          },
+          {
+            "type_name": "pubkey",
+            "name": "anonPk"
+          }
+        ],
+        "entrypoint": true,
+        "return_types": [],
+        "body": [
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "call",
+                "data": {
+                  "name": "checkSig",
+                  "args": [
+                    {
+                      "kind": "identifier",
+                      "data": "anonSig"
+                    },
+                    {
+                      "kind": "identifier",
+                      "data": "anonPk"
+                    }
+                  ]
+                }
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "time_op",
+            "data": {
+              "tx_var": "this_age",
+              "expr": {
+                "kind": "identifier",
+                "data": "MIN_AGE"
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "binary",
+                "data": {
+                  "op": "eq",
+                  "left": {
+                    "kind": "nullary",
+                    "data": "tx_outputs_length"
+                  },
+                  "right": {
+                    "kind": "int",
+                    "data": 1
+                  }
+                }
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "binary",
+                "data": {
+                  "op": "ge",
+                  "left": {
+                    "kind": "introspection",
+                    "data": {
+                      "kind": "output_value",
+                      "index": {
+                        "kind": "int",
+                        "data": 0
+                      }
+                    }
+                  },
+                  "right": {
+                    "kind": "identifier",
+                    "data": "TOKEN_VAL"
+                  }
+                }
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "bytes34",
+              "modifiers": [],
+              "name": "lockA",
+              "expr": {
+                "kind": "new",
+                "data": {
+                  "name": "LockingBytecodeP2PK",
+                  "args": [
+                    {
+                      "kind": "identifier",
+                      "data": "candidateA"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "bytes34",
+              "modifiers": [],
+              "name": "lockB",
+              "expr": {
+                "kind": "new",
+                "data": {
+                  "name": "LockingBytecodeP2PK",
+                  "args": [
+                    {
+                      "kind": "identifier",
+                      "data": "candidateB"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "bytes34",
+              "modifiers": [],
+              "name": "lockC",
+              "expr": {
+                "kind": "new",
+                "data": {
+                  "name": "LockingBytecodeP2PK",
+                  "args": [
+                    {
+                      "kind": "identifier",
+                      "data": "candidateC"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "bytes",
+              "modifiers": [],
+              "name": "outScript",
+              "expr": {
+                "kind": "introspection",
+                "data": {
+                  "kind": "output_locking_bytecode",
+                  "index": {
+                    "kind": "int",
+                    "data": 0
+                  }
+                }
+              }
+            }
+          },
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "binary",
+                "data": {
+                  "op": "or",
+                  "left": {
+                    "kind": "binary",
+                    "data": {
+                      "op": "or",
+                      "left": {
+                        "kind": "binary",
+                        "data": {
+                          "op": "eq",
+                          "left": {
+                            "kind": "identifier",
+                            "data": "outScript"
+                          },
+                          "right": {
+                            "kind": "identifier",
+                            "data": "lockA"
+                          }
+                        }
+                      },
+                      "right": {
+                        "kind": "binary",
+                        "data": {
+                          "op": "eq",
+                          "left": {
+                            "kind": "identifier",
+                            "data": "outScript"
+                          },
+                          "right": {
+                            "kind": "identifier",
+                            "data": "lockB"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "data": {
+                      "op": "eq",
+                      "left": {
+                        "kind": "identifier",
+                        "data": "outScript"
+                      },
+                      "right": {
+                        "kind": "identifier",
+                        "data": "lockC"
+                      }
+                    }
+                  }
+                }
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "bytes",
+              "modifiers": [],
+              "name": "covId",
+              "expr": {
+                "kind": "call",
+                "data": {
+                  "name": "OpInputCovenantId",
+                  "args": [
+                    {
+                      "kind": "nullary",
+                      "data": "active_input_index"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "binary",
+                "data": {
+                  "op": "eq",
+                  "left": {
+                    "kind": "call",
+                    "data": {
+                      "name": "OpCovOutCount",
+                      "args": [
+                        {
+                          "kind": "identifier",
+                          "data": "covId"
+                        }
+                      ]
+                    }
+                  },
+                  "right": {
+                    "kind": "int",
+                    "data": 1
+                  }
+                }
+              },
+              "message": null
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "abi": [
+    {
+      "name": "vote",
+      "inputs": [
+        {
+          "name": "anonSig",
+          "type_name": "sig"
+        },
+        {
+          "name": "anonPk",
+          "type_name": "pubkey"
+        }
+      ]
+    }
+  ],
+  "without_selector": true
+}

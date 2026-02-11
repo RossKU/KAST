@@ -1,0 +1,46 @@
+pragma silverscript ^0.1.0;
+
+// ============================================================
+// KAST Phase 4: Tally / Collection Contract
+// ============================================================
+// Locking script for candidate collection addresses.
+// Vote UTXOs arrive here during Phase 3.
+//
+// Tallying mechanism:
+//   - Each candidate has a unique KASTTally instance
+//     (compiled with their pubkey as candidatePk)
+//   - Number of UTXOs at this script = number of votes
+//   - Anyone can count by querying covenant UTXOs on-chain
+//
+// Timelock:
+//   - During election: UTXOs are locked (cannot be spent)
+//   - After election: authority can release for cleanup
+//   - Prevents candidates from manipulating vote UTXOs
+//
+// Constructor args (per candidate):
+//   candidatePk      = candidate's pubkey (identifies which candidate)
+//   electionAuthority = commission pubkey for post-election release
+//   electionEnd      = DaaScore after which release is allowed
+// ============================================================
+
+contract KASTTally(pubkey candidatePk, pubkey electionAuthority, int electionEnd) {
+    int constant TOKEN_VAL = 1;
+
+    // ----------------------------------------------------------
+    // release: Post-election cleanup / archival
+    // ----------------------------------------------------------
+    // Only callable after election period ends.
+    // Authority consolidates vote UTXOs for archival.
+    // ----------------------------------------------------------
+    entrypoint function release(sig authSig) {
+        // Only election authority can release
+        require(checkSig(authSig, electionAuthority));
+
+        // Timelock: election must have ended
+        require(tx.time >= electionEnd);
+
+        // Value preservation on consolidation
+        int inputVal = tx.inputs[this.activeInputIndex].value;
+        require(tx.outputs[0].value >= inputVal);
+    }
+}

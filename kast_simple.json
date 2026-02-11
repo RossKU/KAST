@@ -1,0 +1,176 @@
+{
+  "contract_name": "KASTSimple",
+  "script": [
+    81,
+    121,
+    81,
+    121,
+    172,
+    105,
+    180,
+    81,
+    156,
+    105,
+    0,
+    194,
+    185,
+    190,
+    2,
+    232,
+    3,
+    148,
+    162,
+    105,
+    117,
+    117,
+    81
+  ],
+  "ast": {
+    "name": "KASTSimple",
+    "params": [],
+    "constants": {},
+    "functions": [
+      {
+        "name": "vote",
+        "params": [
+          {
+            "type_name": "sig",
+            "name": "voterSig"
+          },
+          {
+            "type_name": "pubkey",
+            "name": "voterPk"
+          }
+        ],
+        "entrypoint": true,
+        "return_types": [],
+        "body": [
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "call",
+                "data": {
+                  "name": "checkSig",
+                  "args": [
+                    {
+                      "kind": "identifier",
+                      "data": "voterSig"
+                    },
+                    {
+                      "kind": "identifier",
+                      "data": "voterPk"
+                    }
+                  ]
+                }
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "binary",
+                "data": {
+                  "op": "eq",
+                  "left": {
+                    "kind": "nullary",
+                    "data": "tx_outputs_length"
+                  },
+                  "right": {
+                    "kind": "int",
+                    "data": 1
+                  }
+                }
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "int",
+              "modifiers": [],
+              "name": "minerFee",
+              "expr": {
+                "kind": "int",
+                "data": 1000
+              }
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "int",
+              "modifiers": [],
+              "name": "inputValue",
+              "expr": {
+                "kind": "introspection",
+                "data": {
+                  "kind": "input_value",
+                  "index": {
+                    "kind": "nullary",
+                    "data": "active_input_index"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "binary",
+                "data": {
+                  "op": "ge",
+                  "left": {
+                    "kind": "introspection",
+                    "data": {
+                      "kind": "output_value",
+                      "index": {
+                        "kind": "int",
+                        "data": 0
+                      }
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "data": {
+                      "op": "sub",
+                      "left": {
+                        "kind": "identifier",
+                        "data": "inputValue"
+                      },
+                      "right": {
+                        "kind": "identifier",
+                        "data": "minerFee"
+                      }
+                    }
+                  }
+                }
+              },
+              "message": null
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "abi": [
+    {
+      "name": "vote",
+      "inputs": [
+        {
+          "name": "voterSig",
+          "type_name": "sig"
+        },
+        {
+          "name": "voterPk",
+          "type_name": "pubkey"
+        }
+      ]
+    }
+  ],
+  "without_selector": true
+}

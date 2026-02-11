@@ -1,0 +1,84 @@
+{
+  "contract_name": "Covenant",
+  "script": [
+    178,
+    82,
+    156,
+    105,
+    185,
+    191,
+    0,
+    135,
+    105,
+    81
+  ],
+  "ast": {
+    "name": "Covenant",
+    "params": [
+      {
+        "type_name": "int",
+        "name": "requiredVersion"
+      }
+    ],
+    "constants": {},
+    "functions": [
+      {
+        "name": "spend",
+        "params": [],
+        "entrypoint": true,
+        "return_types": [],
+        "body": [
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "binary",
+                "data": {
+                  "op": "eq",
+                  "left": {
+                    "kind": "nullary",
+                    "data": "tx_version"
+                  },
+                  "right": {
+                    "kind": "identifier",
+                    "data": "requiredVersion"
+                  }
+                }
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "binary",
+                "data": {
+                  "op": "eq",
+                  "left": {
+                    "kind": "nullary",
+                    "data": "active_bytecode"
+                  },
+                  "right": {
+                    "kind": "bytes",
+                    "data": [
+                      0
+                    ]
+                  }
+                }
+              },
+              "message": null
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "abi": [
+    {
+      "name": "spend",
+      "inputs": []
+    }
+  ],
+  "without_selector": true
+}

@@ -1,0 +1,17 @@
+pragma silverscript ^0.1.0;
+
+// KAST Simple Vote - no constructor args
+contract KASTSimple() {
+    entrypoint function vote(sig voterSig, pubkey voterPk) {
+        // Verify voter signature
+        require(checkSig(voterSig, voterPk));
+
+        // Exactly 1 output
+        require(tx.outputs.length == 1);
+
+        // Value preservation (minus miner fee)
+        int minerFee = 1000;
+        int inputValue = tx.inputs[this.activeInputIndex].value;
+        require(tx.outputs[0].value >= inputValue - minerFee);
+    }
+}

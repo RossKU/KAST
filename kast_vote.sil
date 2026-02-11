@@ -1,0 +1,67 @@
+pragma silverscript ^0.1.0;
+
+// ============================================================
+// KAST Phase 3: Voting Contract
+// ============================================================
+// Locking script on the anonymous token UTXO.
+// Voter scans QR2 -> selects candidate -> terminal sends Vote TX.
+//
+// This script is IDENTICAL for all anonymous tokens (uniform
+// structure prevents chain analysis / pattern fingerprinting).
+//
+// Enforced rules:
+//   1. Valid signature from anonymous key holder
+//   2. Exactly 1 output (the vote)
+//   3. Output destination is one of the whitelisted candidates
+//   4. Value preservation (1 sompi)
+//   5. Covenant chain continues (same election ID)
+//   6. Minimum age since anonymization (phase separation)
+//
+// Constructor args (same for all voters in one election):
+//   candidateA/B/C = candidate collection pubkeys
+//
+// NOTE: Full DaaScore-based time window enforcement is not yet
+// in SilverScript. Uses this.age for minimum delay between
+// anonymization and voting. Production should use OpTxInputDaaScore.
+// ============================================================
+
+contract KASTVote(pubkey candidateA, pubkey candidateB, pubkey candidateC) {
+    int constant TOKEN_VAL = 1;
+    int constant MIN_AGE = 300;
+
+    entrypoint function vote(sig anonSig, pubkey anonPk) {
+        // ---- Authorization ----
+        // Anonymous key signature (QR2 holder)
+        require(checkSig(anonSig, anonPk));
+
+        // ---- Minimum age ----
+        // Anonymous token must exist for MIN_AGE seconds
+        // Creates temporal separation between anon and vote phases
+        require(this.age >= MIN_AGE);
+
+        // ---- Output constraints ----
+        // Exactly 1 output
+        require(tx.outputs.length == 1);
+
+        // Value preservation
+        require(tx.outputs[0].value >= TOKEN_VAL);
+
+        // ---- Candidate whitelist ----
+        // Output must go to one of the registered candidates
+        bytes34 lockA = new LockingBytecodeP2PK(candidateA);
+        bytes34 lockB = new LockingBytecodeP2PK(candidateB);
+        bytes34 lockC = new LockingBytecodeP2PK(candidateC);
+        bytes outScript = tx.outputs[0].lockingBytecode;
+
+        require(
+            outScript == lockA
+            || outScript == lockB
+            || outScript == lockC
+        );
+
+        // ---- Covenant chain ----
+        // Vote output continues the election covenant
+        bytes covId = OpInputCovenantId(this.activeInputIndex);
+        require(OpCovOutCount(covId) == 1);
+    }
+}

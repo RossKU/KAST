@@ -1,0 +1,14 @@
+=== Scanning TN12 wRPC endpoints ===
+
+  ws://tn12.kaspa.stream:17210 → timeout
+  wss://tn12.kaspa.stream:17210 → timeout
+  ws://tn12.kaspa.stream:17110 → timeout
+  wss://tn12.kaspa.stream:17110 → timeout
+  ws://tn12.kaspa.stream:17210 → undefined
+  ws://tn12.kaspa.stream:18210 → timeout
+  wss://tn12.kaspa.stream:17210 → undefined
+  wss://tn12.kaspa.stream:18210 → timeout
+  ws://tn12-wrpc.kaspa.stream:17210 → undefined
+  wss://wrpc.tn12.kaspa.stream:443 → undefined
+  ws://tn12.kaspa.stream:17110 → undefined
+  wss://tn12.kaspa.stream/wrpc → undefined

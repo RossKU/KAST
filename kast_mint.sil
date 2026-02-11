@@ -1,0 +1,71 @@
+pragma silverscript ^0.1.0;
+
+// ============================================================
+// KAST Phase 1: Token Minting Contract
+// ============================================================
+// Election commission's master UTXO that mints voter tokens.
+// Requires dual-signature from 2 commissioners.
+// Mints tokens in fixed batches with continuation, or seals
+// (burns) the master to end issuance permanently.
+//
+// Covenant chain: all outputs inherit the election covenant_id.
+// ============================================================
+
+contract KASTMint(pubkey commissioner1, pubkey commissioner2) {
+    int constant BATCH = 4;
+    int constant TOKEN_VAL = 1;
+
+    // ----------------------------------------------------------
+    // mint: Issue a batch of BATCH voter tokens + continuation
+    // ----------------------------------------------------------
+    // Outputs[0..BATCH-1] = voter token UTXOs (value = 1 sompi)
+    // Outputs[BATCH]      = continuation master UTXO (same script)
+    // ----------------------------------------------------------
+    entrypoint function mint(sig sig1, sig sig2) {
+        // Dual-sig authorization from commissioners
+        require(checkSig(sig1, commissioner1));
+        require(checkSig(sig2, commissioner2));
+
+        // Exactly BATCH tokens + 1 continuation
+        require(tx.outputs.length == BATCH + 1);
+
+        // Each token output must have uniform value
+        for(i, 0, BATCH) {
+            require(tx.outputs[i].value == TOKEN_VAL);
+        }
+
+        // Continuation output preserves the master contract
+        require(tx.outputs[BATCH].lockingBytecode == this.activeBytecode);
+
+        // All outputs belong to the same covenant chain
+        bytes covId = OpInputCovenantId(this.activeInputIndex);
+        require(OpCovOutCount(covId) == BATCH + 1);
+    }
+
+    // ----------------------------------------------------------
+    // seal: Final mint — burn master UTXO (no continuation)
+    // ----------------------------------------------------------
+    // Outputs[0..N-1] = last batch of voter tokens (N <= BATCH)
+    // No continuation output => master UTXO destroyed forever
+    // ----------------------------------------------------------
+    entrypoint function seal(sig sig1, sig sig2) {
+        // Dual-sig authorization
+        require(checkSig(sig1, commissioner1));
+        require(checkSig(sig2, commissioner2));
+
+        // At least 1 token, at most BATCH tokens, NO continuation
+        require(tx.outputs.length >= 1);
+        require(tx.outputs.length <= BATCH);
+
+        // All outputs are voter tokens with uniform value
+        for(i, 0, BATCH) {
+            if (i < tx.outputs.length) {
+                require(tx.outputs[i].value == TOKEN_VAL);
+            }
+        }
+
+        // Covenant chain: all outputs belong to same election
+        bytes covId = OpInputCovenantId(this.activeInputIndex);
+        require(OpCovOutCount(covId) == tx.outputs.length);
+    }
+}

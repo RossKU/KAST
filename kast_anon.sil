@@ -1,0 +1,54 @@
+pragma silverscript ^0.1.0;
+
+// ============================================================
+// KAST Phase 2: Anonymization Contract
+// ============================================================
+// Locking script on each voter's identifiable token UTXO.
+// Voter brings QR1 to polling station -> identity verified ->
+// token exchanged for anonymous QR2.
+//
+// Security model:
+//   - 2-of-2 signature: voter key (QR1) + station terminal key
+//   - Stolen QR1 alone is useless without station co-sign
+//   - Minimum age: UTXO must exist for MIN_AGE before anonymize
+//
+// Constructor args are per-voter (compiled individually):
+//   voterPk   = voter's public key (baked into QR1)
+//   stationPk = polling station terminal's public key
+//
+// NOTE: ZK proof (OpZkPrecompile 0xa6) is not yet available
+// in SilverScript. When added, Phase 2 will include Merkle
+// membership proof to sever the voter<->anonymous token link.
+//
+// NOTE: DaaScore-based time window enforcement is not yet in
+// SilverScript. Currently uses this.age for minimum delay.
+// Full Window 1/Window 2 separation requires OpTxInputDaaScore.
+// ============================================================
+
+contract KASTAnon(pubkey voterPk, pubkey stationPk) {
+    int constant TOKEN_VAL = 1;
+    int constant MIN_AGE = 600;
+
+    entrypoint function anonymize(sig voterSig, sig stationSig) {
+        // ---- Authorization: 2-of-2 ----
+        require(checkSig(voterSig, voterPk));
+        require(checkSig(stationSig, stationPk));
+
+        // ---- Minimum age ----
+        // Token must have existed for MIN_AGE seconds since minting
+        // Prevents race conditions between minting and anonymization
+        require(this.age >= MIN_AGE);
+
+        // ---- Output constraints ----
+        // Exactly 1 output: the anonymous token
+        require(tx.outputs.length == 1);
+
+        // Value preservation (uniform 1 sompi)
+        require(tx.outputs[0].value >= TOKEN_VAL);
+
+        // ---- Covenant chain ----
+        // Anonymous token must continue the election covenant
+        bytes covId = OpInputCovenantId(this.activeInputIndex);
+        require(OpCovOutCount(covId) == 1);
+    }
+}
