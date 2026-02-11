@@ -16,7 +16,7 @@ const {
 } = kaspa;
 
 // Load compiled SilverScript bytecode
-const contract = JSON.parse(fs.readFileSync('../kast_simple.json', 'utf-8'));
+const contract = JSON.parse(fs.readFileSync('../build/kast_simple.json', 'utf-8'));
 console.log('Contract:', contract.contract_name);
 console.log('Bytecode:', Buffer.from(contract.script).toString('hex'));
 console.log('Bytecode length:', contract.script.length, 'bytes');
