@@ -4,472 +4,474 @@
 >
 > *"Cast your vote. Burn the proof. Keep the truth."*
 
-## モチベーション
-
-KAST の目的は選挙を再発明することではない。既存の選挙システムをブロックチェーンに固定し、**改竄不可能にすること**である。
-
-今日の投票インフラは既に機能している。紙の投票用紙、封筒、対面での本人確認、公開集計。欠けているのは、不正・改竄・不透明性に対する**暗号学的保証**だけだ。KAST は馴染みのある物理的な投票体験を維持しつつ、トークン発行・匿名化・投票・集計の全ステップを Kaspa の L1 コンセンサスに埋め込み、その全てを不可逆かつ公開検証可能にする。
-
-### 実装スコープ
-
-**Covenant++ ハードフォーク（TN12）** により、KAST の限定的だが機能する部分集合が実現可能である。UTXO による 1 回限りの投票トークン、ZK ベースの有権者資格証明、Covenant による候補者制約、オンチェーンでの透明な集計。これはパイロット運用や概念実証選挙には十分である。
-
-ただし、本番レベルの国政選挙 — 暗号化集計、委任投票、選挙区横断合成、完全な受領証不可能性が求められる — には、**vProgs を待つのが賢明**である。vProgs は CairoVM 実行、Computation DAG によるグローバルステート管理、Proof Stitching をもたらし、大規模選挙が要求する暗号学的精緻さを Kaspa の L1 セキュリティモデルを損なうことなく実現する。
-
-**要するに: Covenant++ でコンセプトを証明し、vProgs でシステムを届ける。**
+**[日本語版 / Japanese](README_JA.md)**
 
 ---
 
-## 概要
+## Motivation
 
-KAST は、Kaspa の Covenant++ ハードフォーク（TN12）の機能を活用した、物理・デジタルハイブリッド型の電子投票プロトコルである。
+The goal of KAST is not to reinvent elections — it is to make the existing system tamper-proof by anchoring it to a blockchain.
 
-UTXO モデルの「1回使ったら消滅する」性質を投票権トークンに応用し、ZK proof による匿名化と Covenant スクリプトによるルール強制を組み合わせることで、**L1 コンセンサスレベルのセキュリティで秘密投票を実現する**。
+Today's voting infrastructure already works: physical ballots, sealed envelopes, in-person ID verification, and public tallying. What it lacks is **cryptographic guarantees** against fraud, manipulation, and opacity. KAST preserves the familiar physical voting experience while embedding every critical step — token issuance, anonymization, casting, and counting — into Kaspa's L1 consensus, making each one immutable and publicly verifiable.
 
-### 基本原則
+### Implementation Scope
 
-| 原則 | 実現手段 |
-|---|---|
-| 1人1票 | UTXO の二重支払い防止 = 二重投票防止 |
-| 投票の秘密 | ZK proof によるリンク切断（投票者 ↔ 投票内容） |
-| 投票参加の証明 | 元トークン UTXO の spent 状態をオンチェーンで確認可能 |
-| 再発行不可 | UTXO 消滅 + Mint 権限の burn |
-| 公開集計 | 候補者アドレスの UTXO カウント（誰でも検証可能） |
-| 改竄不可能 | Kaspa L1 コンセンサス（PoW + DAG）がトランザクションを保護 |
+With the **Covenant++ hard fork (TN12)**, a limited but functional subset of KAST is achievable: one-time vote tokens via UTXO, ZK-based eligibility proofs, covenant-enforced candidate constraints, and transparent on-chain tallying. This is sufficient for pilot deployments and proof-of-concept elections.
+
+However, for production-grade national elections — requiring encrypted tallying, liquid delegation, cross-district composability, and full receipt-freeness — **waiting for vProgs is the prudent path**. vProgs will bring CairoVM execution, global state management via Computation DAG, and Proof Stitching, enabling the cryptographic sophistication that large-scale elections demand without compromising Kaspa's L1 security model.
+
+**In short: Covenant++ proves the concept. vProgs delivers the system.**
 
 ---
 
-## アーキテクチャ
+## Overview
 
-### 使用する Kaspa Covenant++ の機能
+KAST is a physical-digital hybrid electronic voting protocol built on Kaspa's Covenant++ hard fork (TN12).
 
-| 機能 | 用途 |
+It applies the UTXO model's "consumed once, gone forever" property to vote tokens, combining ZK proof-based anonymization with covenant script rule enforcement to achieve **secret ballot elections with L1 consensus-level security**.
+
+### Core Principles
+
+| Principle | Mechanism |
 |---|---|
-| Covenant ID | 選挙トークンの一意な識別子。全トークンが同一 covenant チェーンに属する |
-| OpZkPrecompile (0xa6) | 有権者資格の ZK 証明を L1 で検証 (RISC0 / Groth16) |
-| イントロスペクション opcodes | 出力先の制約、トークン量の保存、時間窓の強制 |
-| UTXO モデル | 1 トークン = 1 投票権。使用後は自動消滅 |
+| One person, one vote | UTXO double-spend prevention = double-vote prevention |
+| Ballot secrecy | ZK proof severs the link between voter and vote content |
+| Proof of participation | Original token UTXO's spent status is verifiable on-chain |
+| Non-reissuable | UTXO destruction + mint authority burn |
+| Public tallying | UTXO count at candidate addresses (verifiable by anyone) |
+| Tamper-proof | Kaspa L1 consensus (PoW + DAG) protects all transactions |
 
-### オンチェーン構造
+---
+
+## Architecture
+
+### Kaspa Covenant++ Features Used
+
+| Feature | Purpose |
+|---|---|
+| Covenant ID | Unique identifier for election tokens. All tokens belong to the same covenant chain |
+| OpZkPrecompile (0xa6) | Verifies voter eligibility ZK proofs on L1 (RISC0 / Groth16) |
+| Introspection opcodes | Output destination constraints, value preservation, time window enforcement |
+| UTXO model | 1 token = 1 vote. Automatically destroyed after use |
+
+### On-chain Structure
 
 ```
-Transaction 構造（変更なし）:
+Transaction structure (unchanged):
   TransactionInput:
-    previous_outpoint    ← 投票トークン UTXO への参照
-    signature_script     ← 署名 + ZK proof データ（バイナリ push）
+    previous_outpoint    ← reference to vote token UTXO
+    signature_script     ← signature + ZK proof data (binary push)
 
   TransactionOutput:
-    value                ← 最小値 (1 sompi)
-    script_public_key    ← Covenant ルール（投票制約スクリプト）
+    value                ← minimum (1 sompi)
+    script_public_key    ← covenant rules (voting constraint script)
     covenant             ← Option<CovenantBinding>
-      authorizing_input  ← 認可する入力のインデックス
-      covenant_id        ← 選挙 ID（Hash）
+      authorizing_input  ← index of the authorizing input
+      covenant_id        ← election ID (Hash)
 ```
 
 ---
 
-## プロトコルフロー
+## Protocol Flow
 
-### Phase 0: 選挙セットアップ
+### Phase 0: Election Setup
 
 ```
-選挙管理委員会:
-  ① 有権者名簿から Merkle tree を構築
-     リーフ = 各有権者の公開鍵
-  ② Election Genesis TX を発行
+Election Commission:
+  1. Build Merkle tree from voter registry
+     Leaf = each voter's public key
+  2. Issue Election Genesis TX
      Output: Election Master UTXO
-       covenant_id: Hash(outpoint + outputs) ← 選挙の一意な ID
-       script_public_key: [Merkle root, 候補者リスト, 選挙ルール]
-  ③ Merkle root と tree サイズをオンチェーンにコミット（公開情報）
+       covenant_id: Hash(outpoint + outputs) ← unique election ID
+       script_public_key: [Merkle root, candidate list, election rules]
+  3. Commit Merkle root and tree size on-chain (public information)
 ```
 
-### Phase 1: トークン発行 + 物理配送
+### Phase 1: Token Minting + Physical Delivery
 
 ```
-Mint TX (選挙管理委員会がマルチシグで実行):
+Mint TX (executed by commission via multisig):
   Input:  Election Master UTXO
   Outputs:
-    [0]: 投票者 A のトークン UTXO
-         covenant_id: 選挙 ID (continuation)
-         script_public_key: <voter_A_pubkey> OpCheckSig + 匿名化ルール
-    [1]: 投票者 B のトークン UTXO
+    [0]: Voter A's token UTXO
+         covenant_id: election ID (continuation)
+         script_public_key: <voter_A_pubkey> OpCheckSig + anonymization rules
+    [1]: Voter B's token UTXO
     ...
-    [N]: 次の Mint 用 Master UTXO (continuation)
-         ※ 最終 Mint TX では continuation なし → Master UTXO 消滅
+    [N]: Next Mint Master UTXO (continuation)
+         * Final Mint TX has no continuation → Master UTXO destroyed
 
-物理配送:
-  各投票者の秘密鍵を QR コード化
-  → 封筒に封入して郵送（QR1）
+Physical delivery:
+  Each voter's private key encoded as QR code
+  → Sealed in envelope and mailed (QR1)
 ```
 
-### Phase 2: 匿名化（投票所での本人確認）
+### Phase 2: Anonymization (Identity Verification at Polling Station)
 
 ```
-[物理プロセス]
-  投票者が封筒の QR1 を投票所に持参
-  → 本人確認（ID チェック）
-  → 投票所端末が匿名化 TX を構築・送信
-  → 新しい QR2（匿名投票トークン）を印刷
+[Physical process]
+  Voter brings QR1 envelope to polling station
+  → Identity verification (ID check)
+  → Station terminal constructs and broadcasts Anonymize TX
+  → Prints new QR2 (anonymous vote token)
 
-[オンチェーンプロセス]
+[On-chain process]
   Anonymize TX:
-    Input: 投票者 A の identifiable トークン UTXO
+    Input: Voter A's identifiable token UTXO
 
     signature_script:
-      ├── 投票者 A の秘密鍵による署名
+      ├── Voter A's signature (signed with private key)
       ├── ZK Proof (RISC0 or Groth16):
-      │     証明内容:
-      │       「私の公開鍵は選挙 Merkle tree に含まれる」
-      │       「この nullifier は私の鍵から一意に導出された」
-      │     非公開:
-      │       どのリーフ（どの投票者）かは隠される
+      │     Proves:
+      │       "My public key is included in the election Merkle tree"
+      │       "This nullifier is uniquely derived from my key"
+      │     Hidden:
+      │       Which leaf (which voter) is not revealed
       └── tag: 0x21 (RISC0 Succinct) or 0x20 (Groth16)
 
-    Output: 匿名トークン UTXO
-      covenant_id: 同じ選挙 ID (continuation)
-      script_public_key: <new_random_pubkey> + 投票先制約ルール
+    Output: Anonymous token UTXO
+      covenant_id: same election ID (continuation)
+      script_public_key: <new_random_pubkey> + vote destination rules
       value: 1 sompi
 
-  ※ この時点で QR1 の UTXO は消滅 → QR1 は無効化
-  ※ Input（投票者 A）と Output（匿名トークン）のリンクは ZK で切断
+  * At this point QR1's UTXO is destroyed → QR1 is invalidated
+  * The link between Input (Voter A) and Output (anonymous token) is severed by ZK
 ```
 
-### Phase 3: 投票
+### Phase 3: Voting
 
 ```
-[物理プロセス]
-  投票者が QR2 を備え付け PC にスキャン
-  → タッチ操作で候補者を選択
-  → 端末が Vote TX を送信
-  → QR2 は使用済み（UTXO 消滅）
+[Physical process]
+  Voter scans QR2 at station PC
+  → Selects candidate via touch interface
+  → Terminal sends Vote TX
+  → QR2 is consumed (UTXO destroyed)
 
-[オンチェーンプロセス]
+[On-chain process]
   Vote TX:
-    Input: 匿名トークン UTXO
+    Input: Anonymous token UTXO
 
     signature_script:
-      └── 匿名鍵での署名
+      └── Signature with anonymous key
 
-    Output: 候補者 C の集票アドレス
-      covenant_id: 同じ選挙 ID (continuation)
+    Output: Candidate C's collection address
+      covenant_id: same election ID (continuation)
       script_public_key: candidate_C_collection_script
       value: 1 sompi
 
-  Covenant スクリプトが強制するルール:
-    OpInputCovenantId      → covenant chain の検証
-    OpCovOutCount          → 出力が 1 つだけであること
-    OpTxOutputSpk          → 出力先が候補者リストに含まれること
-    OpTxOutputAmount       → value が保存されること
+  Rules enforced by covenant script:
+    OpInputCovenantId      → verify covenant chain
+    OpCovOutCount          → exactly 1 output
+    OpTxOutputSpk          → output destination is in candidate list
+    OpTxOutputAmount       → value is preserved
 ```
 
-### Phase 4: 集計
+### Phase 4: Tallying
 
 ```
-候補者 A の集票アドレスの UTXO 数 = 候補者 A の得票数
-候補者 B の集票アドレスの UTXO 数 = 候補者 B の得票数
+UTXO count at Candidate A's collection address = Candidate A's votes
+UTXO count at Candidate B's collection address = Candidate B's votes
 ...
 
-→ オンチェーンで誰でも検証可能
-→ 中央サーバーや管理者の介入なし
+→ Verifiable on-chain by anyone
+→ No central server or administrator involvement
 ```
 
-### Phase 5: 検証
+### Phase 5: Verification
 
 ```
-投票参加の証明:
-  投票者 A の元トークン UTXO → spent（オンチェーンで確認可能）
-  → 「投票者 A は投票に参加した」 ✓
+Proof of participation:
+  Voter A's original token UTXO → spent (verifiable on-chain)
+  → "Voter A participated in the election" ✓
 
-投票内容の秘匿:
-  投票者 A の匿名トークン → 候補者 ? のアドレス
-  → Phase 2 でリンクが切断されているため追跡不可能 ✓
-```
-
----
-
-## QR トークンのライフサイクル
-
-### QR1（封筒で郵送）
-
-```
-生成 → 封筒で郵送 → 投票所で使用（匿名化 TX）→ UTXO 消滅 → 終わり
-
-×再利用: UTXO が存在しない（コンセンサスが拒否）
-×再発行: Master UTXO が burn 済み（mint 権限が消滅）
-×コピー: 先に使われたら UTXO 消滅、後から使えない
-         + 投票所での本人確認 (2-of-2 マルチシグ) が必要
-```
-
-### QR2（投票所で印刷）
-
-```
-投票所端末で生成 → その場で投票に使用 → UTXO 消滅 → 終わり
-
-×再利用: UTXO が存在しない
-×再発行: QR1 が消滅済みなので匿名化 TX を再実行できない
-×コピー: 端末内で生成・即使用なので物理的にコピー困難
+Vote content secrecy:
+  Voter A's anonymous token → Candidate ?'s address
+  → Link severed in Phase 2, untraceable ✓
 ```
 
 ---
 
-## セキュリティ: 攻撃ベクトルと対策
+## QR Token Lifecycle
 
-### 1. タイミング分析攻撃
-
-**脅威**: 匿名化 TX と投票 TX の時間的近接性から、投票者と投票内容のリンクを推測される。
+### QR1 (Mailed in Envelope)
 
 ```
-例: 投票者 A が 14:32:01 に匿名化、14:32:03 に候補者 X へ投票
-    → 時間相関から A → X の投票が推測される
+Generated → mailed in envelope → used at polling station (Anonymize TX) → UTXO destroyed → done
+
+× Reuse: UTXO no longer exists (consensus rejects)
+× Reissue: Master UTXO already burned (mint authority destroyed)
+× Copy: if used first, UTXO is gone; cannot be used again
+         + identity verification at polling station (2-of-2 multisig) required
 ```
 
-**対策**:
+### QR2 (Printed at Polling Station)
 
-| 対策 | 実装方法 |
-|---|---|
-| 時間窓バッチング | Covenant スクリプトで OpTxInputDaaScore を使い、匿名化期間と投票期間を分離。Window 1 (午前): 匿名化のみ、Window 2 (午後): 投票のみ |
-| 高 BPS の活用 | Kaspa 100 BPS 環境では 1 秒に 100 ブロック。同一ブロック内に多数の TX が入り、個別のリンクが困難 |
-| 端末バッチ送信 | 投票所端末が匿名化 TX をキューに蓄積し、まとめてブロードキャスト。個人のタイミングが隠れる |
+```
+Generated at terminal → used immediately for voting → UTXO destroyed → done
 
-### 2. 選挙管理委員会の不正（トークン水増し）
-
-**脅威**: 委員会が有権者数以上のトークンを発行し、不正投票を行う。
-
-**対策**:
-
-| 対策 | 実装方法 |
-|---|---|
-| Mint 権限の封印 | 最終 Mint TX で Master UTXO を burn（continuation output を作らない）。以降 mint 不可 |
-| 発行数の公開検証 | Merkle tree のリーフ数 = 有権者数（公開情報）。Mint TX はオンチェーンで全て可視。発行トークン数と名簿を照合可能 |
-| マルチシグ要求 | Master UTXO の script_public_key に OpCheckMultiSig を設定。N-of-M 署名がないと Mint 不可（単独犯の防止） |
-| Covenant による制約 | 出力数 ≤ Merkle tree サイズ + 1 (continuation) をスクリプトで強制 |
-
-### 3. QR1 の盗難・紛失
-
-**脅威**: 封筒を盗まれた場合、攻撃者が先に投票トークンを使用する。
-
-**対策**:
-
-| 対策 | 実装方法 |
-|---|---|
-| 2-of-2 マルチシグ | QR1 の UTXO = 投票者の鍵 + 投票所端末の鍵。両方が揃わないと匿名化 TX を実行できない。封筒を盗んだだけでは不可 |
-| 投票所での本人確認 | 物理 ID チェック（免許証、マイナンバーカード等）を端末署名の前提条件にする |
-| 紛失時の扱い | 再発行不可（Master は burn 済み）。投票権の喪失として扱う（紙の投票用紙の紛失と同等） |
-
-### 4. 強制投票（脅迫・買収）
-
-**脅威**: 「候補者 X に入れたことを証明しろ」と脅迫される。
-
-**対策**:
-
-| 対策 | 実装方法 |
-|---|---|
-| 匿名鍵の破棄 | QR2 の秘密鍵を投票所端末のセキュア環境（TEE）で生成・使用・即破棄。投票者自身も匿名鍵を知らない設計 |
-| リンク切断の不可逆性 | ZK proof による匿名化は一方向。投票者が「自分の匿名トークンはこれだ」と証明する手段がない |
-| 物理的分離 | 投票所の端末は外部通信を遮断。投票画面の撮影を物理的に防止（投票ブース設計） |
-
-### 5. 投票所端末の改竄
-
-**脅威**: 端末が投票者の選択と異なる候補者に投票する。
-
-**対策**:
-
-| 対策 | 実装方法 |
-|---|---|
-| 投票確認画面 | TX 送信前に選択内容を表示し、投票者が確認。候補者アドレスのハッシュを表示 |
-| オープンソース端末 | 投票所端末のソフトウェアを公開。第三者監査を可能にする |
-| 端末の多重検証 | 複数の独立した端末で TX を構築し、一致を確認してから送信 |
-| 投票後レシート | 投票した候補者アドレスの短縮ハッシュを印刷。事後検証に利用可能（ただし脅迫対策とのバランスが必要） |
-
-### 6. Sybil 攻撃（偽有権者の登録）
-
-**脅威**: 架空の有権者を名簿に追加し、Merkle tree に含める。
-
-**対策**:
-
-| 対策 | 実装方法 |
-|---|---|
-| 名簿の公開監査 | 有権者名簿（Merkle tree のリーフ数）を公開。人口統計データとの照合 |
-| 既存制度との連携 | 住民基本台帳やマイナンバーとの紐づけにより、実在する有権者のみを登録 |
-| Merkle root の事前公開 | 投票開始前に Merkle root を公開し、有権者が自分の inclusion を検証可能 |
-
-### 7. ネットワーク攻撃（51% 攻撃）
-
-**脅威**: Kaspa ネットワークの過半数のハッシュレートを取得し、投票 TX を改竄する。
-
-**対策**:
-
-| 対策 | 実装方法 |
-|---|---|
-| Kaspa の PoW + DAG 耐性 | DAG 構造により、単純な 51% 攻撃が従来のブロックチェーンより困難 |
-| 投票期間の制限 | 短い投票期間を設定し、攻撃者がハッシュレートを集める時間を制限 |
-| ファイナリティの確認 | 十分な確認数（DAG depth）を待ってから集計を確定 |
-| 多層検証 | オンチェーン結果と投票所の物理ログを照合 |
-
-### 8. プライバシー漏洩（チェーン分析）
-
-**脅威**: 投票 TX のパターン分析（金額、手数料、スクリプトサイズ）から投票者を特定する。
-
-**対策**:
-
-| 対策 | 実装方法 |
-|---|---|
-| 均一な TX 構造 | 全投票 TX の value、手数料、スクリプトサイズを統一。パターン分析の余地を排除 |
-| 固定額の投票トークン | 全トークンが 1 sompi で統一 |
-| 統一スクリプト | 匿名トークンの script_public_key を全投票者で同一構造にする |
+× Reuse: UTXO no longer exists
+× Reissue: QR1 already destroyed, cannot re-execute Anonymize TX
+× Copy: generated and used within terminal, physically difficult to copy
+```
 
 ---
 
-## Kaspa の技術的優位性
+## Security: Attack Vectors and Countermeasures
 
-### なぜ Kaspa なのか
+### 1. Timing Analysis Attack
 
-| 比較軸 | Ethereum (Account) | Bitcoin (UTXO) | Kaspa Covenant++ (UTXO) |
+**Threat**: Temporal proximity between Anonymize TX and Vote TX could allow linking voter to vote content.
+
+```
+Example: Voter A anonymizes at 14:32:01, votes for Candidate X at 14:32:03
+         → Time correlation suggests A → X
+```
+
+**Countermeasures**:
+
+| Countermeasure | Implementation |
+|---|---|
+| Time-window batching | Covenant script uses OpTxInputDaaScore to separate anonymization and voting periods. Window 1 (morning): anonymization only. Window 2 (afternoon): voting only |
+| High BPS utilization | Kaspa at 100 BPS produces 100 blocks per second. Many TXs land in the same block, making individual linking difficult |
+| Terminal batch broadcast | Polling station terminals queue Anonymize TXs and broadcast in batches, concealing individual timing |
+
+### 2. Election Commission Fraud (Token Inflation)
+
+**Threat**: Commission mints more tokens than eligible voters and casts fraudulent votes.
+
+**Countermeasures**:
+
+| Countermeasure | Implementation |
+|---|---|
+| Mint authority sealing | Final Mint TX burns Master UTXO (no continuation output). Minting becomes impossible thereafter |
+| Public issuance audit | Merkle tree leaf count = voter count (public). All Mint TXs are visible on-chain. Token count can be cross-referenced with voter rolls |
+| Multisig requirement | Master UTXO's script_public_key requires OpCheckMultiSig. N-of-M signatures needed to mint (prevents single-actor fraud) |
+| Covenant constraint | Output count ≤ Merkle tree size + 1 (continuation) enforced by script |
+
+### 3. QR1 Theft or Loss
+
+**Threat**: If the envelope is stolen, the attacker could use the vote token first.
+
+**Countermeasures**:
+
+| Countermeasure | Implementation |
+|---|---|
+| 2-of-2 multisig | QR1's UTXO = voter's key + station terminal's key. Both required to execute Anonymize TX. Stealing the envelope alone is insufficient |
+| In-person ID verification | Physical ID check (driver's license, national ID, etc.) is a prerequisite for terminal co-signing |
+| Loss handling | Non-reissuable (Master is burned). Treated as loss of voting right (equivalent to losing a paper ballot) |
+
+### 4. Coercion and Vote Buying
+
+**Threat**: Voter is pressured to prove they voted for a specific candidate.
+
+**Countermeasures**:
+
+| Countermeasure | Implementation |
+|---|---|
+| Anonymous key destruction | QR2's private key is generated, used, and immediately destroyed within the terminal's secure environment (TEE). The voter never knows the anonymous key |
+| Irreversible link severance | ZK-based anonymization is one-way. The voter has no means to prove which anonymous token was theirs |
+| Physical isolation | Polling station terminals are air-gapped. Voting booth design physically prevents screen capture |
+
+### 5. Polling Station Terminal Tampering
+
+**Threat**: A compromised terminal votes for a different candidate than the voter selected.
+
+**Countermeasures**:
+
+| Countermeasure | Implementation |
+|---|---|
+| Confirmation screen | Display selection before TX broadcast. Show candidate address hash for verification |
+| Open-source terminal | Polling station software is publicly available for third-party audit |
+| Multi-terminal verification | Multiple independent terminals construct the TX; broadcast only if they agree |
+| Post-vote receipt | Print short hash of the voted candidate address for post-hoc verification (balanced against coercion concerns) |
+
+### 6. Sybil Attack (Fake Voter Registration)
+
+**Threat**: Fictitious voters are added to the registry and included in the Merkle tree.
+
+**Countermeasures**:
+
+| Countermeasure | Implementation |
+|---|---|
+| Public registry audit | Voter registry (Merkle tree leaf count) is public. Cross-referenced with census data |
+| Integration with existing systems | Linked to national resident registry or national ID system; only verified individuals are registered |
+| Pre-election Merkle root publication | Merkle root published before voting begins. Voters can verify their own inclusion |
+
+### 7. Network Attack (51% Attack)
+
+**Threat**: Attacker acquires majority hashrate on Kaspa network and alters vote TXs.
+
+**Countermeasures**:
+
+| Countermeasure | Implementation |
+|---|---|
+| Kaspa's PoW + DAG resilience | DAG structure makes simple 51% attacks harder than on traditional blockchains |
+| Limited voting period | Short voting window limits the time available for an attacker to amass hashrate |
+| Finality confirmation | Wait for sufficient confirmations (DAG depth) before finalizing results |
+| Multi-layer verification | Cross-reference on-chain results with physical polling station logs |
+
+### 8. Privacy Leakage (Chain Analysis)
+
+**Threat**: Pattern analysis of vote TXs (amounts, fees, script sizes) could identify voters.
+
+**Countermeasures**:
+
+| Countermeasure | Implementation |
+|---|---|
+| Uniform TX structure | All vote TXs have identical value, fee, and script size. Eliminates pattern analysis vectors |
+| Fixed token amount | All tokens are uniformly 1 sompi |
+| Unified script | Anonymous token's script_public_key uses identical structure for all voters |
+
+---
+
+## Why Kaspa
+
+| Dimension | Ethereum (Account) | Bitcoin (UTXO) | Kaspa Covenant++ (UTXO) |
 |---|---|---|---|
-| 1人1票の保証 | mapping + require で手動実装 | スクリプト制限で困難 | **UTXO の天然保証** |
-| 二重投票防止 | コントラクトのバグリスク | ○ | **コンセンサスレベルで保証** |
-| 投票の秘密 | Tornado Cash 等の外部依存 | 実現困難 | **L1 ZK プリコンパイルで実現** |
-| 集計の透明性 | コントラクトの信頼が必要 | ○ | **UTXO カウントで自明** |
-| 処理速度 | ~15 TPS | ~7 TPS | **10-100 BPS、並列処理可能** |
-| 中央サーバー | 不要 | 不要 | **不要** |
-| ルール強制 | EVM (攻撃面が広い) | 制限的 | **Covenant (最小限の攻撃面)** |
+| One-person-one-vote | Manual via mapping + require | Difficult due to script limits | **Native UTXO guarantee** |
+| Double-vote prevention | Smart contract bug risk | ○ | **Consensus-level guarantee** |
+| Ballot secrecy | External tools (Tornado Cash, etc.) | Difficult | **L1 ZK precompile** |
+| Tally transparency | Requires contract trust | ○ | **Self-evident via UTXO count** |
+| Throughput | ~15 TPS | ~7 TPS | **10-100 BPS, parallelizable** |
+| Central server | Not required | Not required | **Not required** |
+| Rule enforcement | EVM (broad attack surface) | Limited | **Covenant (minimal attack surface)** |
 
-### 他の ZK / プライバシーチェーンとの比較
+### Comparison with Other ZK / Privacy Chains
 
-投票システムに適した L1 は他にも存在する。以下は KAST の要件に照らした正直な比較である。
+Other L1s are viable candidates for voting systems. The following is an honest comparison against KAST's requirements.
 
 | | Kaspa (Covenant++ / vProgs) | Aztec (Ethereum L2) | Aleo | Cardano (eUTXO) |
 |---|---|---|---|---|
-| コンセンサス | **PoW（検閲耐性最強）** | PoS（Ethereum 依存） | PoS | PoS |
-| データモデル | **UTXO** | Notes（UTXO 的） | Records（UTXO 的） | **eUTXO** |
-| プライバシー | ZK proof で実装 | **ネイティブ（全 TX 暗号化）** | **ネイティブ** | ZK proof で実装 |
-| L1 ZK 検証 | **あり（Groth16 / RISC0）** | **あり** | **あり** | 限定的 |
-| L1 プログラマビリティ | 制限的（スタックベース） | 高い（Noir 言語） | 高い（Leo 言語） | 高い（Plutus） |
-| スループット | **10,000+ TPS（100 BPS 時）** | Ethereum 依存 | 低い | 低い |
+| Consensus | **PoW (strongest censorship resistance)** | PoS (Ethereum) | PoS | PoS |
+| Data model | **UTXO** | Notes (UTXO-like) | Records (UTXO-like) | **eUTXO** |
+| Privacy | Via ZK proof | **Native (all TXs encrypted)** | **Native** | Via ZK proof |
+| L1 ZK verification | **Yes (Groth16 / RISC0)** | **Yes** | **Yes** | Limited |
+| L1 programmability | Limited (stack-based) | High (Noir) | High (Leo) | High (Plutus) |
+| Throughput | **10,000+ TPS (at 100 BPS)** | Ethereum-dependent | Low | Low |
 
-#### プライバシー: Aztec / Aleo の方が上
+#### Privacy: Aztec and Aleo are superior
 
-Aztec と Aleo は、全トランザクションにプライバシーがプロトコルレベルで組み込まれている。つまり KAST の Phase 2（匿名化ステップ）のような追加処理なしに、投票者の匿名性が自動的に確保される。Kaspa ではこの匿名化を ZK proof + UTXO 遷移で明示的に実装する必要がある。
+Aztec and Aleo embed privacy at the protocol level into every transaction. This means voter anonymity is guaranteed automatically, without the explicit anonymization step (Phase 2) that KAST requires. On Kaspa, anonymization must be explicitly implemented via ZK proofs and UTXO transitions.
 
-#### プログラマビリティ: Kaspa L1 は制限的、ただし KAST には十分
+#### Programmability: Kaspa L1 is limited, but sufficient for KAST
 
-Kaspa の L1 スクリプトは Bitcoin Script の拡張であり、チューリング不完全である。ループ、動的配列、再帰といった構造は使えない。Aztec (Noir)、Aleo (Leo)、Cardano (Plutus) は汎用プログラミング言語に近い表現力を持つ。
+Kaspa's L1 script is an extension of Bitcoin Script and is not Turing-complete. Loops, dynamic arrays, and recursion are unavailable. Aztec (Noir), Aleo (Leo), and Cardano (Plutus) offer expressiveness close to general-purpose programming languages.
 
-ただし、KAST が必要とするロジックは L1 スクリプトの範囲内で全て記述可能である:
+However, every piece of logic KAST requires can be expressed within the L1 script's capabilities:
 
-- Merkle membership 検証 → `OpZkPrecompile` で ZK proof を検証
-- 1 入力 → 1 出力の制約 → `OpCovOutCount` で強制
-- 出力先が候補者リスト内 → `OpTxOutputSpk` で検証
-- トークン量の保存 → `OpTxOutputAmount` で検証
-- 時間窓の制約 → `OpTxInputDaaScore` で強制
+- Merkle membership verification → `OpZkPrecompile` verifies ZK proof
+- 1 input → 1 output constraint → `OpCovOutCount` enforces
+- Output destination in candidate list → `OpTxOutputSpk` verifies
+- Value preservation → `OpTxOutputAmount` verifies
+- Time window constraint → `OpTxInputDaaScore` enforces
 
-暗号化集計や委任投票など、より複雑なロジックは将来の vProgs（CairoVM L2）で対応する。
+More complex logic such as encrypted tallying and liquid delegation will be addressed by vProgs (CairoVM L2) in the future.
 
-#### vProgs (L2) のセキュリティ: Based Rollup 設計
+#### vProgs (L2) Security: Based Rollup Design
 
-vProgs は「Based Rollup」設計を採用しており、一般的な L2 とは異なり、L1 への依存度が極めて高い:
+vProgs adopts a "Based Rollup" design, which differs fundamentally from typical L2s in its extreme dependence on L1:
 
-| 役割 | 一般的な L2 | Kaspa vProgs |
+| Role | Typical L2 | Kaspa vProgs |
 |---|---|---|
-| シーケンシング（TX 順序確定） | 独自シーケンサー（検閲リスク） | **Kaspa L1 が担当（PoW で保護）** |
-| データ可用性 | 独自 or 外部 DA（隠蔽リスク） | **Kaspa L1 が全データ保持** |
-| 決済（正当性検証） | 詐欺証明 or ZK proof | **ZK proof で L1 が検証** |
-| 実行 | L2 上 | **オフチェーン（CairoVM）** |
+| Sequencing (TX ordering) | Own sequencer (censorship risk) | **Kaspa L1 handles it (PoW-protected)** |
+| Data availability | Own or external DA (hiding risk) | **Kaspa L1 holds all data** |
+| Settlement (validity verification) | Fraud proofs or ZK proofs | **ZK proofs verified by L1** |
+| Execution | On L2 | **Off-chain (CairoVM)** |
 
-L2 が独自に担うのは実行のみであり、シーケンシング・データ可用性・決済は全て L1 の PoW コンセンサスに委ねられる。vProgs を攻撃するには「ZK proof の数学を破る」か「Kaspa L1 の PoW を破る」しかなく、いずれも現実的ではない。
+The only role L2 assumes independently is execution. Sequencing, data availability, and settlement are all delegated to L1's PoW consensus. Attacking vProgs requires either "breaking ZK proof mathematics" or "breaking Kaspa L1's PoW" — neither of which is practically feasible.
 
-#### 検閲耐性: 選挙で最も重要な要件
+#### Censorship Resistance: The most critical requirement for elections
 
-選挙は国家権力と直接衝突するユースケースである。DeFi や NFT であれば PoS チェーンでも十分だが、投票システムでは政府が投票 TX を検閲するインセンティブを持つ。
+Elections are a use case that directly confronts state power. While PoS chains are adequate for DeFi or NFTs, voting systems face a unique threat: governments have a direct incentive to censor vote transactions.
 
-- **PoW**: マイナーは匿名で世界中に分散しており、特定の TX を拒否させることが構造的に困難
-- **PoS**: バリデータは既知でありステーキング額で特定可能。理論的に政府がバリデータに圧力をかけ、特定の TX を拒否させることが可能
+- **PoW**: Miners are anonymous and globally distributed. Structurally difficult to compel them to reject specific transactions.
+- **PoS**: Validators are known and identifiable by their stake. Theoretically possible for a government to pressure validators into rejecting specific transactions.
 
-投票システムにとって、PoW の検閲耐性は「あれば望ましい」ではなく「なければ致命的」な要件である。
+For voting systems, PoW censorship resistance is not a "nice-to-have" — it is a "fatal if absent" requirement.
 
-#### スループット: 10,000+ TPS で世界中の選挙に対応
+#### Throughput: 10,000+ TPS covers elections worldwide
 
-Kaspa は 100 BPS 到達時に 10,000+ TPS を実現する。以下は主要国の国政選挙に必要な TPS の試算:
+Kaspa achieves 10,000+ TPS at 100 BPS. The following estimates show the TPS required for national elections in major countries:
 
-| 国 | 投票者数 | 投票時間 | 必要 TPS | 10,000 TPS に対する負荷 |
+| Country | Voters | Voting hours | Required TPS | Load on 10,000 TPS |
 |---|---|---|---|---|
-| 日本 | 5,500 万人 | 13 時間 | ~2,350 | 23% |
-| アメリカ | 1.44 億人 | 13 時間 | ~6,150 | 62% |
-| EU 全体 | 1.85 億人 | 13 時間 | ~7,900 | 79% |
-| インド | 6.2 億人 | 複数日に分散 | 分散で対応可 | — |
+| Japan | 55 million | 13 hours | ~2,350 | 23% |
+| United States | 144 million | 13 hours | ~6,150 | 62% |
+| EU (combined) | 185 million | 13 hours | ~7,900 | 79% |
+| India | 620 million | Spread over multiple days | Distributed | — |
 
-KAST では 1 投票者あたり 2 TX（匿名化 + 投票）を必要とする。日本の国政選挙は Kaspa の処理能力の 23% 程度で処理可能であり、ピーク負荷を考慮しても十分な余裕がある。
+KAST requires 2 TXs per voter (anonymization + voting). Japan's national election can be processed at roughly 23% of Kaspa's capacity, with ample headroom even under peak load conditions.
 
-#### 結論: なぜ Kaspa なのか
+#### Conclusion: Why Kaspa
 
-プライバシー単体では Aztec / Aleo が優位であり、L1 プログラマビリティでは Cardano / Ethereum が上回る。しかし、**PoW による検閲耐性 + UTXO モデル + L1 ZK 検証 + 10,000+ TPS** を全て備えるチェーンは Kaspa 以外に存在しない。
+Aztec and Aleo are superior in privacy alone, and Cardano and Ethereum surpass Kaspa in L1 programmability. However, **no other chain combines PoW censorship resistance + UTXO model + L1 ZK verification + 10,000+ TPS**.
 
-選挙システムにおいて検閲耐性は最優先の要件であり、この点で PoS チェーンは PoW に勝てない。Kaspa は「投票のために設計されたわけではないが、投票に最も適した技術的組み合わせを持つチェーン」である。
+Censorship resistance is the highest-priority requirement for election systems, and PoS chains cannot match PoW on this front. Kaspa was not designed for voting, but it possesses the most suitable combination of properties for building a voting system.
 
-### 使用するオペコード一覧
+### Opcodes Used
 
-| カテゴリ | オペコード | コード | 用途 |
+| Category | Opcode | Code | Purpose |
 |---|---|---|---|
-| ZK 検証 | OpZkPrecompile | 0xa6 | 有権者資格の ZK proof 検証 |
-| Covenant | OpInputCovenantId | 0xcf | 選挙 covenant chain の検証 |
-| Covenant | OpCovOutCount | 0xd2 | 同一 covenant 出力数の制約 |
-| Covenant | OpCovOutputIdx | 0xd3 | 同一 covenant 出力インデックス |
-| Covenant | OpAuthOutputCount | 0xcb | 認可された出力数 |
-| イントロスペクション | OpTxOutputSpk | 0xc3 | 出力先が候補者リストに含まれるか検証 |
-| イントロスペクション | OpTxOutputAmount | 0xc2 | トークン量の保存を検証 |
-| イントロスペクション | OpTxInputAmount | 0xbe | 入力トークン量の確認 |
-| イントロスペクション | OpTxInputDaaScore | 0xc0 | 時間窓の強制（バッチング） |
-| 署名 | OpCheckSig | 0xac | 投票者 / 端末の署名検証 |
-| 署名 | OpCheckMultiSig | 0xae | 委員会マルチシグ / 2-of-2 |
-| ハッシュ | OpBlake2b | 0xaa | nullifier 導出、データハッシュ |
+| ZK Verification | OpZkPrecompile | 0xa6 | Verify voter eligibility ZK proof |
+| Covenant | OpInputCovenantId | 0xcf | Verify election covenant chain |
+| Covenant | OpCovOutCount | 0xd2 | Constrain same-covenant output count |
+| Covenant | OpCovOutputIdx | 0xd3 | Same-covenant output index |
+| Covenant | OpAuthOutputCount | 0xcb | Authorized output count |
+| Introspection | OpTxOutputSpk | 0xc3 | Verify output is in candidate list |
+| Introspection | OpTxOutputAmount | 0xc2 | Verify value preservation |
+| Introspection | OpTxInputAmount | 0xbe | Confirm input token amount |
+| Introspection | OpTxInputDaaScore | 0xc0 | Enforce time windows (batching) |
+| Signature | OpCheckSig | 0xac | Voter / terminal signature verification |
+| Signature | OpCheckMultiSig | 0xae | Commission multisig / 2-of-2 |
+| Hash | OpBlake2b | 0xaa | Nullifier derivation, data hashing |
 
 ---
 
-## 制約と今後の展望
+## Limitations and Future Outlook
 
-### Covenant++ 段階での制約
+### Limitations at the Covenant++ Stage
 
-| 制約 | 説明 |
+| Limitation | Description |
 |---|---|
-| 投票内容の暗号化集計 | 候補者アドレスへの送信方式では、匿名トークンの送り先自体は公開。リンクが切れているので実用上問題ないが、完全な暗号化集計には vProgs が必要 |
-| スクリプトサイズ制限 | 複雑な投票ルール（委任投票、順位投票等）は L1 スクリプトの制約に収まらない可能性がある |
-| インデクサーの必要性 | covenant_id ベースの集計クエリを効率的に行うには、専用のインデクサーが必要 |
+| Encrypted tallying | With the "send to candidate address" model, the anonymous token's destination is public. Not a practical issue since the link is severed, but fully encrypted tallying requires vProgs |
+| Script size limits | Complex voting rules (delegated voting, ranked-choice, etc.) may not fit within L1 script constraints |
+| Indexer dependency | Efficient covenant_id-based tally queries require a dedicated indexer |
 
-### vProgs 時代の拡張（将来）
+### Future Extensions with vProgs
 
-| 拡張 | 説明 |
+| Extension | Description |
 |---|---|
-| 完全暗号化投票 | CairoVM + Stwo で投票内容を暗号化したまま集計。候補者アドレスすら非公開 |
-| 委任投票 (Liquid Democracy) | vProg のグローバルステートで委任関係を管理 |
-| リアルタイム投票率表示 | vProg が投票状況を集計し、ZK proof 付きで公開 |
-| クロス選挙区合成 | 複数の選挙区 vProg を Proof Stitching で結合 |
+| Fully encrypted voting | CairoVM + Stwo enables tallying encrypted votes. Even candidate addresses remain hidden |
+| Liquid Democracy | vProg global state manages delegation relationships |
+| Real-time turnout display | vProg aggregates voting status, published with ZK proof |
+| Cross-district composition | Multiple district vProgs combined via Proof Stitching |
 
 ---
 
-## 技術スタック
+## Tech Stack
 
-| コンポーネント | 技術 |
+| Component | Technology |
 |---|---|
-| L1 ブロックチェーン | Kaspa (PoW + blockDAG, Covenant++ HF) |
-| ZK 証明生成 | RISC0 (Rust ゲストプログラム) / Groth16 (ark-bn254) |
-| ZK 証明検証 | OpZkPrecompile (0xa6) on Kaspa L1 |
-| Merkle tree | Blake2b ハッシュベース |
-| トークン管理 | Covenant ID + UTXO |
-| 物理配送 | QR コード封入封筒 |
-| 投票端末 | オープンソース、TEE 対応 |
+| L1 Blockchain | Kaspa (PoW + blockDAG, Covenant++ HF) |
+| ZK Proof Generation | RISC0 (Rust guest program) / Groth16 (ark-bn254) |
+| ZK Proof Verification | OpZkPrecompile (0xa6) on Kaspa L1 |
+| Merkle Tree | Blake2b hash-based |
+| Token Management | Covenant ID + UTXO |
+| Physical Delivery | QR code in sealed envelope |
+| Voting Terminal | Open-source, TEE-enabled |
 
 ---
 
-## ライセンス
+## License
 
 ISC
 
 ---
 
-## 参考
+## References
 
 - [Kaspa rusty-kaspa TN12](https://github.com/kaspanet/rusty-kaspa/tree/tn12)
-- [Kaspa TN12 ドキュメント](https://github.com/kaspanet/rusty-kaspa/blob/tn12/docs/testnet12.md)
+- [Kaspa TN12 Documentation](https://github.com/kaspanet/rusty-kaspa/blob/tn12/docs/testnet12.md)
 - [kaspanet/vprogs](https://github.com/kaspanet/vprogs)
 - [vProgs Yellow Paper](https://kaspa.co.il/wp-content/uploads/2025/09/vProgs_yellow_paper.pdf)
 - [Michael Sutton's covenant++ notes](https://gist.github.com/michaelsutton/5bd9ab358f692ee4f54ce2842a0815d1)
