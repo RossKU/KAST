@@ -622,6 +622,51 @@ Attack TX:
 | Dual-commissioner check | Both commissioners must co-sign mint. Suppression requires both to collude. Independent commissioner appointment reduces this risk |
 | Legal framework | Intentional mint refusal constitutes election fraud under most jurisdictions. HSM audit logs provide cryptographic evidence of mint operations (or absence thereof) |
 
+### 21. Setup Integrity (Constructor Parameter Tampering)
+
+**Threat**: All KAST contracts are parameterized at deployment time. If constructor arguments are tampered with or misconfigured, the entire election is compromised — and the error may not be detectable until post-election audit.
+
+```
+Specific risks:
+  a) Candidate pubkey substitution: cand3 replaced with commissioner's key
+     → votes for candidate 3 are silently redirected
+  b) Duplicate candidate keys: cand2 == cand5
+     → two candidates share an address, votes are merged
+  c) Dummy key collision: unused slot's burn key matches a real candidate
+  d) electionEnd too early: set before voting period ends
+     → recover/release callable during election (premature token recovery)
+  e) electionEnd too late: deposits locked long after election
+```
+
+**Countermeasures**:
+
+| Countermeasure | Implementation |
+|---|---|
+| Public parameter registry | All constructor args published before election. Candidate pubkeys cross-referenced with official candidate registry. Anyone can verify |
+| Parameter validation tool | Automated pre-deployment check: no duplicate keys, no known burn-key collisions, electionEnd within valid range, TOKEN_VAL matches specification |
+| Multi-party parameter ceremony | Constructor args assembled by multiple independent parties (commission + observers + candidates). All parties sign the final parameter set |
+| On-chain parameter commitment | Hash of all constructor args committed on-chain before deployment. Post-deployment bytecode verified against commitment |
+| electionEnd safety margin | electionEnd set to voting period end + buffer (e.g., +24 hours). Too-early values rejected by validation tool |
+
+### 22. Build and Deploy Chain Attack (Supply Chain)
+
+**Threat**: Even if source code is audited and correct, the deployed bytecode may differ from the source. Attack vectors include: compiler backdoor (Thompson attack), build environment compromise, or bytecode substitution at deployment time.
+
+```
+Source (.sil) → [Compiler] → Bytecode (JSON) → [Deploy] → On-chain
+     ✓ audited     ??? untrusted    ??? unverified      ??? unchecked
+```
+
+**Countermeasures**:
+
+| Countermeasure | Implementation |
+|---|---|
+| Deterministic builds | Compiler runs in a reproducible environment (Docker with pinned image hash). Multiple independent parties compile from the same source and verify bytecode hash matches |
+| Bytecode hash registry | SHA-256 hashes of all compiled contracts published before election. Post-deployment verification: on-chain bytecode hash vs registry |
+| Compiler pinning | `pragma silverscript 0.1.0` (exact, not `^0.1.0`). Compiler binary hash published alongside contract hashes |
+| Multi-party compilation | At least 3 independent parties (commission, opposition, civil society) compile the contracts. Deployment proceeds only if all bytecode hashes match |
+| On-chain source verification | Contract source code committed on-chain (as OP_RETURN or separate TX). Anyone can recompile and verify |
+
 ---
 
 ## Physical-Digital Audit
@@ -838,6 +883,45 @@ Security hardening (v2.1): exact value matching (`==` not `>=`) prevents fingerp
 | Voter-ballot linking permitted | US states (IN, NC) | ZK can be made optional |
 | Terminal trust verification | General | Parallel paper ballot + Benaloh Challenge + Physical-Digital Audit API |
 | Elderly / low-digital-literacy | Japan, many countries | Handwritten candidate name on QR2 paper (familiar voting experience) |
+
+---
+
+## Quality Control Checklist
+
+Pre-deployment and operational quality gates. Items marked (protocol) are enforced by the contract/chain; items marked (process) require organizational procedures.
+
+### Pre-Election
+
+| # | Gate | Type | Description |
+|---|---|---|---|
+| QC-1 | Deterministic build verification | Process | Multiple independent parties compile source → verify bytecode hash match (Vector 22) |
+| QC-2 | Constructor parameter validation | Process | Automated tool checks: no duplicate candidate keys, electionEnd in valid range, TOKEN_VAL correct (Vector 21) |
+| QC-3 | Multi-party parameter ceremony | Process | Constructor args assembled and signed by commission + observers + candidates |
+| QC-4 | On-chain parameter commitment | Protocol | Hash of all constructor args committed before deployment. Verifiable by anyone |
+| QC-5 | Compiler version pinning | Process | Exact compiler version (not semver range) locked and published |
+| QC-6 | Key ceremony | Process | Commissioner keys generated in HSM with geographically distributed backup. electionAuthority key generated separately |
+| QC-7 | Terminal attestation | Process | TEE remote attestation verifies terminal software integrity before election day |
+| QC-8 | Dry run (mock election) | Process | Full end-to-end rehearsal on testnet: Mint → Anon → Vote → Aggregate → Release → Audit |
+| QC-9 | Parallel election isolation | Process | Each concurrent election uses independent Master UTXO (distinct covenant_id). Terminal software validates election ID before processing |
+
+### Election Day
+
+| # | Gate | Type | Description |
+|---|---|---|---|
+| QC-10 | Real-time mint monitoring | Process | Public dashboard: mints per station per hour. Alert on anomalous drops or spikes |
+| QC-11 | Batch timing verification | Process | Verify all stations are broadcasting in randomized batches (not individual TXs) |
+| QC-12 | Incident response protocol | Process | Documented escalation: terminal failure → backup terminal; network outage → offline queue; key loss → adjacent station handoff |
+| QC-13 | Voter complaint channel | Process | On-site mechanism with timestamped records. Threshold violations trigger immediate supervisor review |
+
+### Post-Election
+
+| # | Gate | Type | Description |
+|---|---|---|---|
+| QC-14 | Three-layer audit execution | Process | Count → Signature → Handwriting verification (see Physical-Digital Audit section) |
+| QC-15 | Dispute resolution protocol | Process | Paper vs chain discrepancy: (1) recount paper, (2) verify TX signatures, (3) if irreconcilable → paper is source of truth for affected station, chain is source of truth globally |
+| QC-16 | Results certification | Process | Final results published only after QC-14 completes with all stations at NORMAL status. Any station with noise rate > threshold triggers manual recount before certification |
+| QC-17 | Evidence preservation | Process | On-chain data is permanent. Paper ballots sealed and stored per jurisdiction's retention law (typically 1-5 years). HSM audit logs exported and archived |
+| QC-18 | Post-mortem | Process | Standardized review: incidents logged, root causes identified, protocol improvements proposed for next election |
 
 ---
 
