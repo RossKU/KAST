@@ -150,35 +150,60 @@ Physical anonymization at the polling station severs the link between voter iden
     signature_script:
       ├── Voter's signature (QR1 private key)
       └── Station terminal's signature (co-sign)
-      [Future: + ZK Proof via OpZkPrecompile for on-chain anonymization]
+      + ZK Proof via OpZkPrecompile (on-chain anonymization)
 
     Output: Anonymous token UTXO
       covenant_id: same election ID (continuation)
-      script_public_key: KASTVote(candidateA, ..., candidateJ)
+      script_public_key: KASTVote(candidateA, ..., candidateJ, electionAuthority, electionEnd)
       value: TOKEN_VAL
 
   Covenant rules enforced (KASTAnon contract):
     checkSig × 2           → 2-of-2: voter key + station key
+    OpZkPrecompile         → ZK proof severs on-chain voter→ballot link
     OpCovOutCount == 1     → exactly 1 anonymous output
-    output.value           → value preservation
+    output.value == TOKEN_VAL → exact value (prevents fingerprinting)
+    recover(sig) + timelock → deposit recovery if voter abandons
 
   * QR1's UTXO is destroyed → QR1 becomes invalid
   * Physical QR exchange provides coercion/bribery resistance
-  * On-chain link (voter → anonymous token) is visible in PoC;
-    will be cryptographically severed when OpZkPrecompile is available
+  * On-chain link is cryptographically severed via ZK proof
 ```
 
-### Phase 3: Voting (Immediate)
+### Phase 3: Voting (Parallel Paper Ballot)
 
-Voter uses QR2 immediately after receiving it. QR2 is physically collected after use, like a paper ballot.
+Voter uses QR2 at the station PC. QR2 paper doubles as a physical ballot — collected after use for post-election audit.
 
 ```
+QR2 paper design:
+  ┌─────────────────────────┐
+  │  [QR Code]              │  ← anonymous key (scanned by terminal)
+  │                         │
+  │  Candidate: ___________ │  ← voter writes name (optional, recommended)
+  │                         │
+  │  Election: 2027 ...     │
+  └─────────────────────────┘
+
 [Physical process]
-  1. Voter scans QR2 at terminal
-  2. Selects candidate on screen
-  3. Terminal constructs and sends Vote TX
-  4. QR2 is physically collected (ballot-box model)
-  5. Voter receives sticker / participation receipt
+  1. Voter receives QR2 paper
+  2. Voter writes candidate name on paper (intent recorded physically FIRST)
+  3. Voter scans QR2 at station PC → selects same candidate on screen
+  4. Terminal displays destination address — voter verifies against posted
+     candidate address list on the booth wall
+  5. Terminal constructs encrypted Vote TX → broadcast
+  6. Optional: voter runs Benaloh Challenge on smartphone (see below)
+  7. QR2 paper collected in ballot box (like a paper ballot)
+  8. Voter receives sticker / participation receipt
+
+[Benaloh Challenge — optional smartphone verification]
+  After step 5, before step 7:
+  a. Terminal displays enc_vote as QR code
+  b. Voter scans with smartphone verification app (open source, multi-vendor)
+  c. Voter taps "Challenge" → terminal reveals randomness as QR
+  d. Voter scans → app decrypts → shows candidate name
+  e. Voter confirms it matches their selection → this vote is DISCARDED
+  f. Repeat until satisfied → final "Cast" sends the real vote
+  * Terminal cannot cheat: encryption binding makes fake randomness impossible
+  * Smartphone only sees discarded challenge votes, not the real cast
 
 [On-chain process]
   Vote TX:
@@ -187,7 +212,7 @@ Voter uses QR2 immediately after receiving it. QR2 is physically collected after
     signature_script:
       └── Signature with anonymous key (QR2)
 
-    Output: Candidate's collection address
+    Output: Encrypted vote → candidate's collection address
       covenant_id: same election ID (continuation)
       script_public_key: candidate collection script (P2PK)
       value: TOKEN_VAL
@@ -196,8 +221,9 @@ Voter uses QR2 immediately after receiving it. QR2 is physically collected after
     checkSig               → anonymous key signature
     OpCovOutCount == 1     → exactly 1 vote output
     OpTxOutputSpk          → destination is in candidate whitelist (up to 10)
-    output.value           → value preservation
+    output.value == TOKEN_VAL → exact value (prevents fingerprinting)
     OpInputCovenantId      → covenant chain verification
+    recover(sig) + timelock → deposit recovery if ballot abandoned
 ```
 
 ### Phase 4: Tallying + Real-time Aggregation
@@ -229,18 +255,42 @@ During the election, the commission periodically consolidates vote UTXOs to free
     → Commission recovers deposited KAS after election concludes
 ```
 
-### Phase 5: Verification
+### Phase 5: Physical-Digital Audit
+
+Post-election, collected QR2 papers are scanned and cross-referenced with on-chain data for full-coverage consistency verification.
 
 ```
-Proof of participation:
+[Audit process — under election observer supervision]
+  1. Ballot boxes opened, QR2 papers extracted
+  2. QR2 papers batch-scanned (barcode reader / camera)
+  3. Anonymous public keys extracted from each QR code
+  4. Audit API cross-references each key with on-chain Vote TX:
+
+     Layer 1 — Count verification (100%, automated):
+       QR2 papers collected vs Vote TXs on chain
+       Match → all votes accounted for
+       Papers < TXs → phantom votes detected (terminal fabrication)
+       Papers > TXs → unused ballots (voter left without voting)
+
+     Layer 2 — Signature verification (100%, automated):
+       Each QR2 public key → find Vote TX signed by this key
+       Verify: covenant chain valid, value == TOKEN_VAL, destination in whitelist
+
+     Layer 3 — Handwriting cross-check (statistical):
+       For papers with handwritten candidate names:
+       OCR / manual read → compare with chain vote destination
+       Normal noise rate: ~2-3% (equivalent to current invalid ballot rate)
+       Anomalous rate (>10%): triggers full investigation at that station
+
+[Proof of participation]
   Voter's QR1 token UTXO → spent (verifiable on-chain)
   → "This voter participated in the election" ✓
-  [Compulsory voting countries: KASTReceipt UTXO as on-chain proof]
+  Compulsory voting countries: KASTReceipt UTXO (separate TX) as supplementary proof
 
-Vote content secrecy:
-  Voter's anonymous token → Candidate ?'s address
-  → Physical QR exchange severs the link ✓
-  → Future ZK proof will make this cryptographically unbreakable
+[Vote content secrecy]
+  ZK proof cryptographically severs voter → ballot link
+  Physical QR exchange provides additional coercion resistance
+  Encrypted voting ensures on-chain vote content is not visible
 ```
 
 ---
@@ -262,17 +312,25 @@ Generated → distributed to voter (empty wallet, keypair only)
 × Photographed: on-chain shows participation only, not vote choice (with ZK)
 ```
 
-### QR2 (Anonymous Ballot — generated at polling station)
+### QR2 (Anonymous Ballot Paper — generated at polling station)
 
 ```
-Generated at terminal (fresh keypair) → handed to voter
-→ Used immediately for voting (Phase 3) → UTXO destroyed
-→ QR2 physically collected (like a paper ballot) → done
+Generated at terminal (fresh keypair) → printed on ballot paper
+  Paper has: QR code (anonymous key) + write area for candidate name
+→ Voter writes candidate name on paper (physical intent record)
+→ Voter scans QR2 at station PC → selects candidate → encrypted Vote TX
+→ Optional: Benaloh Challenge on smartphone (terminal honesty verification)
+→ QR2 paper collected in ballot box → done
+
+Post-election:
+→ QR2 papers batch-scanned → API cross-references with on-chain votes
+→ Handwritten names compared with chain results (statistical audit)
+→ Count of papers vs count of on-chain TXs (full-coverage verification)
 
 × Reuse: UTXO no longer exists
 × Reissue: QR1 already destroyed, cannot re-execute Anonymize TX
-× Coercion: voter cannot prove vote choice (QR2 collected, link severed)
-× Recovered: with ZK, cannot trace back to voter even if QR2 is found
+× Coercion: voter cannot prove vote choice (QR2 collected, vote encrypted, link severed)
+× Recovered: ZK prevents tracing back to voter; encrypted vote hides candidate choice
 ```
 
 ---
@@ -406,6 +464,125 @@ Example: Voter A arrives at 14:30, on-chain shows Mint at 14:31, Anon at 14:32, 
 | Aggregation delay detection | If the authority delays aggregation, deposit runs low and JIT minting slows. This is publicly observable and triggers audit |
 | Independent aggregation audit | Any observer can verify every Aggregate TX: sum of inputs == output value, same covenant chain, same script. Anomalies are detectable |
 | Selective aggregation defense | Even if the authority only aggregates certain candidates, the raw UTXO count remains on-chain as ground truth. Aggregation cannot erase individual vote UTXOs — only consolidate them |
+
+### 10. Terminal Trust (Vote Integrity)
+
+**Threat**: The station terminal generates QR2's private key and constructs the Vote TX. The voter has no cryptographic control over Phase 3 — the terminal could cast a vote for a different candidate than selected.
+
+**Countermeasures**:
+
+| Countermeasure | Implementation |
+|---|---|
+| Parallel paper ballot | Voter writes candidate name on QR2 paper BEFORE digital vote. Paper serves as physical intent record. Post-election audit compares paper with on-chain results |
+| Benaloh Challenge (smartphone) | Voter optionally verifies terminal honesty via open-source app. Terminal commits to encrypted vote, voter challenges by requesting decryption. Encryption binding makes forgery mathematically impossible. Verified on voter's own device |
+| Candidate address poster | Candidate collection addresses posted on booth wall (physical, pre-printed). Voter visually confirms terminal's displayed address matches the poster |
+| Physical-digital audit | All collected QR2 papers are scanned post-election. API cross-references QR2 keys with on-chain TXs. Count discrepancy or handwriting mismatch triggers investigation |
+| Multi-terminal consensus | Multiple independent terminals construct the TX; broadcast only if outputs match |
+
+### 11. Mempool Censorship (Selective TX Filtering)
+
+**Threat**: Miners observe Vote TX destinations in the mempool and selectively delay or exclude votes for specific candidates. Requires far less than 51% hashrate — even 10% can create statistically significant bias.
+
+**Countermeasures**:
+
+| Countermeasure | Implementation |
+|---|---|
+| Encrypted voting | Vote TX contains encrypted candidate choice. Miners cannot determine the destination candidate. Censorship becomes random (useless) |
+| Station batch broadcast | TXs are batched and broadcast to multiple nodes simultaneously, reducing single-miner censorship opportunity |
+| DAG structure | Kaspa's DAG allows parallel blocks. Censored TX can be included by any other miner within 100ms |
+| Censorship monitoring | Real-time comparison of broadcast TXs vs confirmed TXs. Anomalous confirmation delays at specific stations trigger alerts |
+
+### 12. Commissioner Key Compromise
+
+**Threat**: Both commissioner private keys are compromised simultaneously — enabling unlimited JIT minting, premature seal, or unauthorized aggregation.
+
+**Countermeasures**:
+
+| Countermeasure | Implementation |
+|---|---|
+| HSM key storage | Commissioner keys stored in Hardware Security Modules. Keys never leave the HSM |
+| Per-station key pairs | Each polling station has unique commissioner key pairs. One station's compromise doesn't affect others |
+| Mint count monitoring | Real-time on-chain monitoring: total minted tokens vs total station visitors. Anomalous mint spikes trigger immediate alert |
+| Seal authority separation | Seal function (Master UTXO burn) requires separate authorization from mint function |
+
+### 13. Deposit Leak (Unspent Tokens)
+
+**Threat**: Voter receives token but never completes the flow (walks away after Phase 1 or Phase 2). Without recovery, TOKEN_VAL per abandoned token is locked permanently.
+
+**Countermeasures**:
+
+| Countermeasure | Implementation |
+|---|---|
+| recover entrypoint | KASTAnon and KASTVote include `recover(sig authSig)` with `require(tx.time >= electionEnd)`. Election authority can reclaim deposits after election |
+| Station monitoring | Station tracks issued QR2s vs completed votes. Uncompleted sessions are flagged for post-election recovery |
+
+### 14. Denial of Service (Election Infrastructure)
+
+**Threat**: Attacker floods the Kaspa network with spam transactions during voting hours, delays block confirmation, or sends dust UTXOs to candidate addresses to bloat the UTXO set.
+
+**Countermeasures**:
+
+| Countermeasure | Implementation |
+|---|---|
+| KIP-9 storage mass | Kaspa's fee model penalizes small UTXO creation. Dust attacks are economically expensive |
+| Covenant filtering | Only covenant-bound UTXOs with the correct election ID participate in tally. Non-covenant dust is ignored |
+| Priority fee lanes | Election TXs can use higher fees to ensure inclusion during congestion |
+| DAG throughput | Kaspa's 10,000+ TPS capacity provides substantial headroom above election requirements (~2,000-6,000 TPS for national elections) |
+
+---
+
+## Physical-Digital Audit
+
+Post-election audit system that provides 100% automated coverage of the vote-to-paper consistency.
+
+### Audit API
+
+```
+POST /api/audit/verify
+  Input:  { pubkey: "<QR2 anonymous public key>" }
+  Output: {
+    vote_tx_found: true,
+    tx_hash: "...",
+    covenant_valid: true,
+    value_correct: true,
+    candidate: "<candidate name>"
+  }
+
+POST /api/audit/batch
+  Input:  { pubkeys: [...], station_id: "tokyo-05" }
+  Output: {
+    papers_scanned: 1000,
+    votes_on_chain: 1000,
+    matched: 1000,
+    phantom_votes: 0,
+    unused_ballots: 0,
+    consistency: 100.0%
+  }
+
+GET /api/audit/station/{station_id}/summary
+  Output: {
+    papers: 1000,
+    chain_votes: 1000,
+    handwritten_submitted: 820,
+    handwritten_match: 802,
+    handwritten_mismatch: 18,
+    noise_rate: 2.2%,
+    status: "NORMAL"
+  }
+```
+
+### Three-Layer Verification
+
+| Layer | Verification | Coverage | Automation |
+|---|---|---|---|
+| 1. Count | QR2 paper count vs on-chain TX count | **100%** | Fully automated |
+| 2. Signature | Each QR2 key → matching Vote TX on chain | **100%** | Fully automated |
+| 3. Handwriting | Written candidate name vs chain destination | Voters who wrote (~80%) | OCR + manual |
+
+Anomaly thresholds:
+- Layer 1: any count discrepancy → immediate investigation
+- Layer 2: any unmatched key → flag as phantom vote or unused ballot
+- Layer 3: noise rate > 10% at any station → full manual recount
 
 ---
 
@@ -553,34 +730,32 @@ Security hardening (v2.1): exact value matching (`==` not `>=`) prevents fingerp
 
 | Requirement | Affected Countries | KAST Approach |
 |---|---|---|
-| Secret ballot | All democracies | Physical QR1/QR2 exchange + future ZK |
+| Secret ballot | All democracies | Physical QR1/QR2 exchange + ZK anonymization |
 | Compulsory voting proof | 27 countries (Bolivia, Australia, etc.) | Phase 2 UTXO spent-status as primary proof; KASTReceipt as optional separate TX |
 | Double-vote prevention | 90+ ink-based countries | Covenant: 1 UTXO = 1 vote (replaces ink) |
-| Mail-in voting | Many countries | Future: online Phase 2 requiring ZK |
-| Timing analysis prevention | General | Phase 2 TX batch broadcast at stations |
+| Timing analysis prevention | General | TX batch broadcast at stations + encrypted voting |
 | Voter-ballot linking permitted | US states (IN, NC) | ZK can be made optional |
+| Terminal trust verification | General | Parallel paper ballot + Benaloh Challenge + Physical-Digital Audit API |
+| Elderly / low-digital-literacy | Japan, many countries | Handwritten candidate name on QR2 paper (familiar voting experience) |
 
 ---
 
-## Limitations and Future Outlook
+## Design Constraints
 
-### Current PoC Limitations
-
-| Limitation | Description | Resolution |
+| Constraint | Impact | Mitigation |
 |---|---|---|
-| OpZkPrecompile (0xa6) | No cryptographic anonymization yet. Physical QR exchange only | Await SilverScript support |
-| OpTxInputDaaScore | No precise time window enforcement | `this.age` as fallback |
-| checkMultiSig | Implemented as dual `checkSig` | Await SilverScript support |
-| MAX_AGGREGATE = 8 | Tally aggregation limited to 8 inputs per TX | Script size limit (10KB); multi-pass |
-| Encrypted tallying | Candidate destination is public on-chain | Requires vProgs (CairoVM) |
-| Script size limits | Complex voting rules may not fit in L1 script | vProgs for advanced logic |
-| Indexer dependency | Efficient covenant_id queries need dedicated indexer | Standard infra |
+| MAX_AGGREGATE = 8 | Tally aggregation limited to 8 inputs per TX | Multi-pass aggregation; compile-time loop unrolling limits |
+| Candidate slots = 10 | Max 10 candidates per election | Sufficient for most elections; expandable with vProgs |
+| Script size limit (10KB) | Complex voting rules may not fit in L1 | vProgs (CairoVM) for advanced logic |
+| Indexer dependency | Efficient covenant_id queries need dedicated indexer | Standard blockchain infrastructure |
+| No remote voting | Physical polling station required | By design — prevents physical coercion attacks |
 
-### Future Extensions with vProgs
+### vProgs Extensions (CairoVM L2)
 
 | Extension | Description |
 |---|---|
-| Fully encrypted voting | CairoVM + Stwo enables tallying encrypted votes. Even candidate addresses remain hidden |
+| Encrypted voting + Benaloh | CairoVM + Stwo enables encrypted ballot casting with smartphone verification |
+| Homomorphic tallying | Tally encrypted votes without decrypting individual ballots |
 | Liquid Democracy | vProg global state manages delegation relationships |
 | Real-time turnout display | vProg aggregates voting status, published with ZK proof |
 | Cross-district composition | Multiple district vProgs combined via Proof Stitching |
@@ -592,12 +767,16 @@ Security hardening (v2.1): exact value matching (`==` not `>=`) prevents fingerp
 | Component | Technology |
 |---|---|
 | L1 Blockchain | Kaspa (PoW + blockDAG, Covenant++ HF) |
+| L2 Execution | vProgs (CairoVM, Based Rollup) |
 | ZK Proof Generation | RISC0 (Rust guest program) / Groth16 (ark-bn254) |
 | ZK Proof Verification | OpZkPrecompile (0xa6) on Kaspa L1 |
+| Vote Encryption | Threshold encryption (commissioner N-of-M decryption) |
+| Voter Verification | Benaloh Challenge (open-source smartphone app) |
 | Merkle Tree | Blake2b hash-based |
 | Token Management | Covenant ID + UTXO |
 | Physical Delivery | QR code in sealed envelope |
 | Voting Terminal | Open-source, TEE-enabled |
+| Audit System | Physical-Digital Audit API (QR2 scan → on-chain cross-reference) |
 
 ---
 
