@@ -16,17 +16,18 @@ Today's voting infrastructure already works: physical ballots, sealed envelopes,
 
 ### Implementation Scope
 
-With the **Covenant++ hard fork (TN12)**, a limited but functional subset of KAST is achievable: one-time vote tokens via UTXO, ZK-based eligibility proofs, covenant-enforced candidate constraints, and transparent on-chain tallying. This is sufficient for pilot deployments and proof-of-concept elections.
+KAST is built on two layers of Kaspa's evolution:
 
-However, for production-grade national elections — requiring encrypted tallying, liquid delegation, cross-district composability, and full receipt-freeness — **waiting for vProgs is the prudent path**. vProgs will bring CairoVM execution, global state management via Computation DAG, and Proof Stitching, enabling the cryptographic sophistication that large-scale elections demand without compromising Kaspa's L1 security model.
+- **Covenant++ (L1)**: UTXO token lifecycle — minting, anonymization, voting, aggregation, timelock release. Enforced by consensus.
+- **vProgs (L2)**: Encrypted ballot casting, Benaloh Challenge verification, homomorphic tallying, and cross-district composition. Executed off-chain via CairoVM, verified on L1 via ZK proofs.
 
-**In short: Covenant++ proves the concept. vProgs delivers the system.**
+Both layers are required for the complete system. Covenant++ provides the token infrastructure; vProgs provides the cryptographic privacy and voter verification layer.
 
 ---
 
 ## Overview
 
-KAST is a physical-digital hybrid electronic voting protocol built on Kaspa's Covenant++ hard fork (TN12).
+KAST is a physical-digital hybrid electronic voting protocol built on Kaspa's Covenant++ (L1) and vProgs (L2).
 
 It applies the UTXO model's "consumed once, gone forever" property to vote tokens, combining ZK proof-based anonymization with covenant script rule enforcement to achieve **secret ballot elections with L1 consensus-level security**.
 
@@ -82,9 +83,9 @@ Transaction structure (unchanged):
 [Election day — at polling station, ~3 minutes per voter]
   Phase 1: Commission JIT-mints token → voter's wallet         (KASTMint)
   Phase 2: Voter + Station 2-of-2 burn → anonymous QR2 issued  (KASTAnon)
-  Phase 3: QR2 used to vote → candidate collection address      (KASTVote)
-           QR2 physically collected (like a paper ballot)
-           Sticker / receipt issued
+  Phase 3: Voter writes candidate on QR2 paper → scans at PC    (KASTVote)
+           → encrypted Vote TX → optional Benaloh on smartphone
+           QR2 paper collected in ballot box
 
 [During election — background]
   Phase 4a: Commission aggregates vote UTXOs in real-time       (KASTTally.aggregate)
@@ -104,7 +105,7 @@ Election Commission:
   2. Generate QR1 for each registered voter
      QR1 = keypair only (empty wallet, no KAS pre-loaded)
      Private key encoded as QR code, distributed to voter
-  3. Build Merkle tree from voter registry (for future ZK verification)
+  3. Build Merkle tree from voter registry (for ZK verification)
      Commit Merkle root on-chain (public information)
 ```
 
@@ -118,7 +119,7 @@ Mint TX (commission dual-sig):
   Outputs:
     [0]: Voter token UTXO (value = TOKEN_VAL)
          covenant_id: election ID (continuation)
-         script_public_key: KASTAnon(voter_pubkey, station_pubkey)
+         script_public_key: KASTAnon(voter_pubkey, station_pubkey, electionAuthority, electionEnd)
     [1]: Continuation Master UTXO (same script)
          * Final Mint TX: no continuation → Master UTXO destroyed (seal)
 
@@ -353,7 +354,7 @@ Example: Voter A arrives at 14:30, on-chain shows Mint at 14:31, Anon at 14:32, 
 | Terminal batch broadcast | Station terminals queue all TXs (Mint, Anon, Vote) and broadcast in randomized batches every N minutes. Individual timing is concealed within the batch |
 | Physical booth separation | Phase 2 (anonymization) and Phase 3 (voting) occur in physically separate booths. Observer cannot correlate which voter enters which booth |
 | High BPS utilization | Kaspa at 100 BPS: many TXs land in the same block. With batching, dozens of voters' TXs are interleaved |
-| Future: DaaScore windows | When OpTxInputDaaScore is available, covenant-enforced time separation between phases can be added |
+| DaaScore windows | When OpTxInputDaaScore is available, covenant-enforced time separation between phases can be added |
 
 ### 2. Election Commission Fraud (Token Inflation)
 
@@ -393,13 +394,13 @@ Example: Voter A arrives at 14:30, on-chain shows Mint at 14:31, Anon at 14:32, 
 | Physical QR exchange | QR1 → QR2 exchange at the station creates a physical break. Voter walks away without any proof of vote choice |
 | QR2 collection | QR2 is physically collected after voting (like a paper ballot in a ballot box). Voter cannot retain proof |
 | Anonymous key destruction | QR2's private key is generated and used within the terminal's secure environment (TEE). Destroyed after Vote TX |
-| Link severance | Physical: only the station sees QR1→QR2 mapping. Future ZK: on-chain link is cryptographically broken |
+| Link severance | Physical: only the station sees QR1→QR2 mapping. ZK: on-chain link is cryptographically broken |
 | Booth isolation | Voting booth prevents screen capture. Terminal is air-gapped |
 | Vote buying futility | Buying QR1 is useless — the buyer cannot control the vote (QR2 is generated at the station with a fresh key) |
 
 ### 5. Polling Station Terminal Tampering
 
-**Threat**: A compromised terminal votes for a different candidate than the voter selected, or leaks the QR1→QR2 mapping.
+**Threat**: A compromised terminal votes for a different candidate than the voter selected, or leaks the QR1→QR2 mapping. (See also: [Vector 10](#10-terminal-trust-vote-integrity) for physical-digital countermeasures)
 
 **Countermeasures**:
 
@@ -445,7 +446,7 @@ Example: Voter A arrives at 14:30, on-chain shows Mint at 14:31, Anon at 14:32, 
 
 | Countermeasure | Implementation |
 |---|---|
-| Uniform TX structure | All vote TXs have identical value (TOKEN_VAL), script size (KASTVote = 488 bytes for all voters), and structure |
+| Uniform TX structure | All vote TXs have identical value (TOKEN_VAL), script size (KASTVote = 549 bytes for all voters), and structure |
 | Fixed token amount | All tokens are uniformly TOKEN_VAL (0.1 KAS). No amount-based fingerprinting |
 | Unified script | KASTVote contract is identical for all voters in one election (same constructor args = same bytecode) |
 | Batch broadcast | TXs are batched at the station, preventing timing-based fingerprinting |
@@ -528,6 +529,18 @@ Example: Voter A arrives at 14:30, on-chain shows Mint at 14:31, Anon at 14:32, 
 | Covenant filtering | Only covenant-bound UTXOs with the correct election ID participate in tally. Non-covenant dust is ignored |
 | Priority fee lanes | Election TXs can use higher fees to ensure inclusion during congestion |
 | DAG throughput | Kaspa's 10,000+ TPS capacity provides substantial headroom above election requirements (~2,000-6,000 TPS for national elections) |
+
+### 15. Mint Output Script Not Enforced
+
+**Threat**: KASTMint enforces TOKEN_VAL and covenant chain continuity, but does **not** verify the output's `lockingBytecode` (destination script). Commissioners could mint tokens directly to KASTVote or KASTTally addresses, bypassing the anonymization step entirely — creating "ghost votes" without a corresponding voter.
+
+**Countermeasures**:
+
+| Countermeasure | Implementation |
+|---|---|
+| Off-chain audit | Every Mint TX output script is visible on-chain. Third-party auditors verify that all minted tokens are locked to KASTAnon scripts. Deviation is immediately detectable |
+| Station cross-reference | Each minted token is tied to a voter arrival (JIT model). Tokens minted to non-KASTAnon scripts have no corresponding voter session |
+| Covenant enforcement (future) | When Kaspa supports `OpTxOutputSpk` pattern matching in Mint scripts, the output destination can be enforced on-chain |
 
 ---
 
@@ -657,12 +670,12 @@ Kaspa achieves 10,000+ TPS at 100 BPS. The following estimates show the TPS requ
 
 | Country | Voters | Voting hours | Required TPS | Load on 10,000 TPS |
 |---|---|---|---|---|
-| Japan | 55 million | 13 hours | ~2,350 | 23% |
-| United States | 144 million | 13 hours | ~6,150 | 62% |
-| EU (combined) | 185 million | 13 hours | ~7,900 | 79% |
+| Japan | 55 million | 13 hours | ~3,525 | 35% |
+| United States | 144 million | 13 hours | ~9,230 | 92% |
+| EU (combined) | 185 million | Multi-day / multi-state | Distributed | — |
 | India | 620 million | Spread over multiple days | Distributed | — |
 
-KAST requires 2 TXs per voter (anonymization + voting). Japan's national election can be processed at roughly 23% of Kaspa's capacity, with ample headroom even under peak load conditions.
+KAST requires 3 TXs per voter (Mint + Anonymize + Vote; Mint batching up to 4 reduces effective count). Japan's national election uses roughly 35% of Kaspa's capacity. Large-scale elections (US, EU) can leverage multi-day voting or higher BPS targets.
 
 #### Conclusion: Why Kaspa
 
