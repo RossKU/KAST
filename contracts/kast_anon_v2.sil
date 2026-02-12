@@ -8,6 +8,8 @@ pragma silverscript ^0.1.0;
 // v2 changes from v1:
 //   - MIN_AGE removed (JIT flow: mint and anonymize immediately)
 //   - TOKEN_VAL = 0.1 KAS
+//   - recover entrypoint: election authority can reclaim deposit
+//     after electionEnd if voter never anonymized
 //
 // Physical flow at polling station:
 //   1. Voter presents QR1 (identity wallet)
@@ -25,15 +27,20 @@ pragma silverscript ^0.1.0;
 //     to prevent timing correlation on-chain
 //
 // Constructor args (per-voter, compiled individually):
-//   voterPk   = voter's public key (baked into QR1)
-//   stationPk = polling station terminal's public key
+//   voterPk           = voter's public key (baked into QR1)
+//   stationPk         = polling station terminal's public key
+//   electionAuthority = commission pubkey (for deposit recovery)
+//   electionEnd       = locktime after which recovery is allowed
 //
 // Future: OpZkPrecompile for cryptographic anonymization
 // ============================================================
 
-contract KASTAnonV2(pubkey voterPk, pubkey stationPk) {
+contract KASTAnonV2(pubkey voterPk, pubkey stationPk, pubkey electionAuthority, int electionEnd) {
     int constant TOKEN_VAL = 10000000;
 
+    // ----------------------------------------------------------
+    // anonymize: Voter + Station co-sign to create anonymous token
+    // ----------------------------------------------------------
     entrypoint function anonymize(sig voterSig, sig stationSig) {
         // ---- Authorization: 2-of-2 ----
         require(checkSig(voterSig, voterPk));
@@ -43,12 +50,24 @@ contract KASTAnonV2(pubkey voterPk, pubkey stationPk) {
         // Exactly 1 output: the anonymous token
         require(tx.outputs.length == 1);
 
-        // Value preservation
-        require(tx.outputs[0].value >= TOKEN_VAL);
+        // Value preservation (exact — prevents fingerprinting)
+        require(tx.outputs[0].value == TOKEN_VAL);
 
         // ---- Covenant chain ----
         // Anonymous token continues the election covenant
         bytes covId = OpInputCovenantId(this.activeInputIndex);
         require(OpCovOutCount(covId) == 1);
+    }
+
+    // ----------------------------------------------------------
+    // recover: Election authority reclaims deposit after election
+    // ----------------------------------------------------------
+    // If voter never anonymized (walked away, lost QR1, etc.),
+    // the token UTXO would be locked forever. This entrypoint
+    // allows the authority to recover the deposit after election.
+    // ----------------------------------------------------------
+    entrypoint function recover(sig authSig) {
+        require(checkSig(authSig, electionAuthority));
+        require(tx.time >= electionEnd);
     }
 }

@@ -11,13 +11,29 @@ pragma silverscript ^0.1.0;
 //   Australia, etc.), voters must prove they voted to avoid
 //   fines or salary deductions.
 //
+// IMPORTANT — Issuance model:
+//   Receipt is issued as a SEPARATE TX, NOT as a second output
+//   of the Anonymize TX. This preserves KASTAnon's strict
+//   outputs.length == 1 constraint and prevents linkability.
+//
+//   Primary proof method:
+//     The voter's KASTAnon UTXO being spent (Phase 2 TX exists)
+//     already proves participation on-chain. Government can
+//     verify: voterPk → KASTAnon UTXO → spent? → participated.
+//
+//   KASTReceipt is an OPTIONAL supplement for jurisdictions
+//   that require a claimable on-chain receipt. It is funded
+//   from election deposit (separate from the vote token covenant
+//   chain) and created by the station after Phase 3 completes.
+//
 // Mechanism:
-//   - Receipt UTXO is created during Phase 2 (anonymization)
-//     as a second output alongside the anonymous token
+//   - Station creates Receipt TX AFTER voter completes voting
+//   - Receipt UTXO is NOT part of the election covenant chain
+//   - Funded from separate election operating funds (not TOKEN_VAL)
 //   - UTXO existence at this script = voter participated
 //   - Voter can claim (spend) the receipt post-election
-//     as proof of participation
 //   - Only the voter's own key can claim (privacy preserved)
+//   - Timing: batched with other receipts to prevent correlation
 //
 // Constructor args (per-voter):
 //   voterPk           = voter's public key (same as QR1)

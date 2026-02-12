@@ -523,10 +523,10 @@ KAST では 1 投票者あたり 2 TX（匿名化 + 投票）を必要とする�
 | Contract | ファイル | Bytecode | ABI | 役割 |
 |---|---|---|---|---|
 | KASTMintV2 | `kast_mint_v2.sil` | 329 B | `mint(sig,sig)` / `seal(sig,sig)` | JIT トークン発行 |
-| KASTAnonV2 | `kast_anon_v2.sil` | 96 B | `anonymize(sig,sig)` | 2-of-2 匿名化 |
-| KASTVoteV2 | `kast_vote_v2.sil` | 488 B | `vote(sig,pubkey)` | 10候補者投票 |
-| KASTTallyV2 | `kast_tally_v2.sil` | 4,010 B | `aggregate(sig)` / `release(sig)` | リアルタイム集約 |
-| KASTReceipt | `kast_receipt.sil` | 95 B | `claim(sig)` / `void(sig)` | 義務投票証明 |
+| KASTAnonV2 | `kast_anon_v2.sil` | 157 B | `anonymize(sig,sig)` / `recover(sig)` | 2-of-2 匿名化 + 預託回収 |
+| KASTVoteV2 | `kast_vote_v2.sil` | 549 B | `vote(sig,pubkey)` / `recover(sig)` | 10候補者投票 + 預託回収 |
+| KASTTallyV2 | `kast_tally_v2.sil` | 4,016 B | `aggregate(sig)` / `release(sig)` | リアルタイム集約 + covenant 終端検証 |
+| KASTReceipt | `kast_receipt.sil` | 95 B | `claim(sig)` / `void(sig)` | 義務投票証明 (独立TX発行) |
 
 ### コスト試算 (5,000万人規模, TOKEN_VAL = 0.1 KAS, 低混雑)
 
@@ -547,7 +547,7 @@ KAST では 1 投票者あたり 2 TX（匿名化 + 投票）を必要とする�
 | MAX_AGGREGATE (Tally) | 8 | スクリプトサイズ上限 (10KB) |
 | 候補者スロット | 10 | 主要な選挙形態をカバー |
 
-詳細設計は [PLAN_V2.md](PLAN_V2.md) を参照。
+セキュリティ強化 (v2.1): value 完全一致 (`==`) でフィンガープリント防止、`recover` で未使用トークンの預託回収、`release` で covenant chain 終端を強制、KASTReceipt は匿名化を保護するため独立TX発行に変更。
 
 ---
 
@@ -556,7 +556,7 @@ KAST では 1 投票者あたり 2 TX（匿名化 + 投票）を必要とする�
 | 要件 | 対象国 | KAST のアプローチ |
 |---|---|---|
 | 秘密投票 | 全民主国家 | QR1/QR2 物理交換 + 将来 ZK |
-| 義務投票証明 | 27カ国 (ボリビア、豪州等) | KASTReceipt オンチェーン UTXO |
+| 義務投票証明 | 27カ国 (ボリビア、豪州等) | Phase 2 UTXO spent-status が主証明; KASTReceipt は補助的に独立TX発行 |
 | 二重投票防止 | インク方式 90カ国以上 | Covenant: 1 UTXO = 1票 (インク不要) |
 | 郵便投票 | 多数国 | 将来: オンライン Phase 2 (ZK必須) |
 | タイミング分析防止 | 全般 | Phase 2 TX を投票所でバッチ送信 |

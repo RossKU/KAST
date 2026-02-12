@@ -1,6 +1,11 @@
 {
   "contract_name": "KASTAnonV2",
   "script": [
+    118,
+    0,
+    156,
+    99,
+    117,
     81,
     121,
     32,
@@ -86,7 +91,7 @@
     150,
     152,
     0,
-    162,
+    156,
     105,
     185,
     207,
@@ -96,7 +101,63 @@
     105,
     117,
     117,
-    81
+    81,
+    103,
+    118,
+    81,
+    156,
+    99,
+    117,
+    0,
+    121,
+    32,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    5,
+    172,
+    105,
+    3,
+    64,
+    75,
+    76,
+    176,
+    117,
+    81,
+    103,
+    117,
+    0,
+    105,
+    104,
+    104
   ],
   "ast": {
     "name": "KASTAnonV2",
@@ -108,6 +169,14 @@
       {
         "type_name": "pubkey",
         "name": "stationPk"
+      },
+      {
+        "type_name": "pubkey",
+        "name": "electionAuthority"
+      },
+      {
+        "type_name": "int",
+        "name": "electionEnd"
       }
     ],
     "constants": {
@@ -202,7 +271,7 @@
               "expr": {
                 "kind": "binary",
                 "data": {
-                  "op": "ge",
+                  "op": "eq",
                   "left": {
                     "kind": "introspection",
                     "data": {
@@ -271,6 +340,52 @@
             }
           }
         ]
+      },
+      {
+        "name": "recover",
+        "params": [
+          {
+            "type_name": "sig",
+            "name": "authSig"
+          }
+        ],
+        "entrypoint": true,
+        "return_types": [],
+        "body": [
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "call",
+                "data": {
+                  "name": "checkSig",
+                  "args": [
+                    {
+                      "kind": "identifier",
+                      "data": "authSig"
+                    },
+                    {
+                      "kind": "identifier",
+                      "data": "electionAuthority"
+                    }
+                  ]
+                }
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "time_op",
+            "data": {
+              "tx_var": "tx_time",
+              "expr": {
+                "kind": "identifier",
+                "data": "electionEnd"
+              },
+              "message": null
+            }
+          }
+        ]
       }
     ]
   },
@@ -287,7 +402,16 @@
           "type_name": "sig"
         }
       ]
+    },
+    {
+      "name": "recover",
+      "inputs": [
+        {
+          "name": "authSig",
+          "type_name": "sig"
+        }
+      ]
     }
   ],
-  "without_selector": true
+  "without_selector": false
 }

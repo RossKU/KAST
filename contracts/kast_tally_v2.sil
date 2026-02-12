@@ -75,6 +75,11 @@ contract KASTTallyV2(pubkey candidatePk, pubkey electionAuthority, int electionE
         // Timelock: election must have ended
         require(tx.time >= electionEnd);
 
+        // Covenant chain must terminate — no covenant outputs allowed
+        // Prevents phantom UTXO creation that could inflate vote count
+        bytes covId = OpInputCovenantId(this.activeInputIndex);
+        require(OpCovOutCount(covId) == 0);
+
         // Value preservation on release
         int inputVal = tx.inputs[this.activeInputIndex].value;
         require(tx.outputs[0].value >= inputVal);

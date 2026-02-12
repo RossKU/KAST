@@ -9,6 +9,8 @@ pragma silverscript ^0.1.0;
 //   - MIN_AGE removed (QR2 used immediately after issuance)
 //   - Candidate count: 3 -> 10 (covers large elections)
 //   - TOKEN_VAL = 0.1 KAS
+//   - recover entrypoint: authority can reclaim deposit after
+//     electionEnd if anonymous token was never used to vote
 //
 // Physical flow:
 //   1. Voter scans QR2 at terminal
@@ -18,33 +20,41 @@ pragma silverscript ^0.1.0;
 //
 // This script is IDENTICAL for all anonymous tokens (uniform
 // structure prevents chain analysis / pattern fingerprinting).
+// Adding electionAuthority + electionEnd does not break
+// uniformity — they are the same for all voters in one election.
 //
 // Enforced rules:
 //   1. Valid signature from anonymous key holder (QR2)
 //   2. Exactly 1 output (the vote)
 //   3. Output destination is one of the 10 whitelisted candidates
-//   4. Value preservation (TOKEN_VAL)
+//   4. Value preservation (TOKEN_VAL, exact match)
 //   5. Covenant chain continues (same election ID)
 //
 // Constructor args (same for all voters in one election):
-//   cand0..cand9 = candidate collection pubkeys
+//   cand0..cand9        = candidate collection pubkeys
+//   electionAuthority   = commission pubkey (for deposit recovery)
+//   electionEnd         = locktime after which recovery is allowed
 //
 // Unused candidate slots filled with a dummy/burn pubkey.
 // ============================================================
 
 contract KASTVoteV2(
     pubkey cand0, pubkey cand1, pubkey cand2, pubkey cand3, pubkey cand4,
-    pubkey cand5, pubkey cand6, pubkey cand7, pubkey cand8, pubkey cand9
+    pubkey cand5, pubkey cand6, pubkey cand7, pubkey cand8, pubkey cand9,
+    pubkey electionAuthority, int electionEnd
 ) {
     int constant TOKEN_VAL = 10000000;
 
+    // ----------------------------------------------------------
+    // vote: Cast anonymous ballot to a whitelisted candidate
+    // ----------------------------------------------------------
     entrypoint function vote(sig anonSig, pubkey anonPk) {
         // ---- Authorization ----
         require(checkSig(anonSig, anonPk));
 
         // ---- Output constraints ----
         require(tx.outputs.length == 1);
-        require(tx.outputs[0].value >= TOKEN_VAL);
+        require(tx.outputs[0].value == TOKEN_VAL);
 
         // ---- Candidate whitelist (10 slots) ----
         bytes34 lock0 = new LockingBytecodeP2PK(cand0);
@@ -76,5 +86,17 @@ contract KASTVoteV2(
         // ---- Covenant chain ----
         bytes covId = OpInputCovenantId(this.activeInputIndex);
         require(OpCovOutCount(covId) == 1);
+    }
+
+    // ----------------------------------------------------------
+    // recover: Election authority reclaims deposit after election
+    // ----------------------------------------------------------
+    // If anonymous token was never used to vote (voter left
+    // without voting, QR2 lost, etc.), the UTXO would be locked
+    // forever. This entrypoint allows recovery after election.
+    // ----------------------------------------------------------
+    entrypoint function recover(sig authSig) {
+        require(checkSig(authSig, electionAuthority));
+        require(tx.time >= electionEnd);
     }
 }

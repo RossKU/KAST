@@ -3997,6 +3997,12 @@
     75,
     76,
     176,
+    185,
+    207,
+    210,
+    0,
+    156,
+    105,
     0,
     194,
     185,
@@ -4346,6 +4352,54 @@
               "expr": {
                 "kind": "identifier",
                 "data": "electionEnd"
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "bytes",
+              "modifiers": [],
+              "name": "covId",
+              "expr": {
+                "kind": "call",
+                "data": {
+                  "name": "OpInputCovenantId",
+                  "args": [
+                    {
+                      "kind": "nullary",
+                      "data": "active_input_index"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "binary",
+                "data": {
+                  "op": "eq",
+                  "left": {
+                    "kind": "call",
+                    "data": {
+                      "name": "OpCovOutCount",
+                      "args": [
+                        {
+                          "kind": "identifier",
+                          "data": "covId"
+                        }
+                      ]
+                    }
+                  },
+                  "right": {
+                    "kind": "int",
+                    "data": 0
+                  }
+                }
               },
               "message": null
             }

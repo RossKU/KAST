@@ -521,10 +521,10 @@ Contracts are written in [SilverScript](https://github.com/aspect-build/silversc
 | Contract | File | Bytecode | ABI | Role |
 |---|---|---|---|---|
 | KASTMintV2 | `kast_mint_v2.sil` | 329 B | `mint(sig,sig)` / `seal(sig,sig)` | JIT token issuance |
-| KASTAnonV2 | `kast_anon_v2.sil` | 96 B | `anonymize(sig,sig)` | 2-of-2 anonymization |
-| KASTVoteV2 | `kast_vote_v2.sil` | 488 B | `vote(sig,pubkey)` | 10-candidate voting |
-| KASTTallyV2 | `kast_tally_v2.sil` | 4,010 B | `aggregate(sig)` / `release(sig)` | Real-time aggregation |
-| KASTReceipt | `kast_receipt.sil` | 95 B | `claim(sig)` / `void(sig)` | Compulsory voting proof |
+| KASTAnonV2 | `kast_anon_v2.sil` | 157 B | `anonymize(sig,sig)` / `recover(sig)` | 2-of-2 anonymization + deposit recovery |
+| KASTVoteV2 | `kast_vote_v2.sil` | 549 B | `vote(sig,pubkey)` / `recover(sig)` | 10-candidate voting + deposit recovery |
+| KASTTallyV2 | `kast_tally_v2.sil` | 4,016 B | `aggregate(sig)` / `release(sig)` | Real-time aggregation + covenant termination |
+| KASTReceipt | `kast_receipt.sil` | 95 B | `claim(sig)` / `void(sig)` | Compulsory voting proof (separate TX) |
 
 ### Cost Estimate (50M voters, TOKEN_VAL = 0.1 KAS, low congestion)
 
@@ -545,7 +545,7 @@ Fee breakdown: Mint 30K (69%, dominated by storage mass) + Anon 10K + Vote 3K + 
 | MAX_AGGREGATE (Tally) | 8 | Script size limit (10KB max) |
 | Candidate slots | 10 | Covers most election types |
 
-See [PLAN_V2.md](PLAN_V2.md) for detailed design documentation.
+Security hardening (v2.1): exact value matching (`==` not `>=`) prevents fingerprinting, `recover` entrypoints prevent permanent deposit lock, `release` enforces covenant chain termination, and KASTReceipt is issued as a separate TX to preserve anonymization.
 
 ---
 
@@ -554,7 +554,7 @@ See [PLAN_V2.md](PLAN_V2.md) for detailed design documentation.
 | Requirement | Affected Countries | KAST Approach |
 |---|---|---|
 | Secret ballot | All democracies | Physical QR1/QR2 exchange + future ZK |
-| Compulsory voting proof | 27 countries (Bolivia, Australia, etc.) | KASTReceipt on-chain UTXO |
+| Compulsory voting proof | 27 countries (Bolivia, Australia, etc.) | Phase 2 UTXO spent-status as primary proof; KASTReceipt as optional separate TX |
 | Double-vote prevention | 90+ ink-based countries | Covenant: 1 UTXO = 1 vote (replaces ink) |
 | Mail-in voting | Many countries | Future: online Phase 2 requiring ZK |
 | Timing analysis prevention | General | Phase 2 TX batch broadcast at stations |
