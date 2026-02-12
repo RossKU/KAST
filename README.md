@@ -410,6 +410,7 @@ Example: Voter A arrives at 14:30, on-chain shows Mint at 14:31, Anon at 14:32, 
 | Open-source terminal | All polling station software is publicly auditable. Hardware attestation via TEE |
 | Multi-terminal verification | Multiple independent terminals construct the TX; broadcast only if outputs match |
 | Log destruction | Station terminal destroys QR1→QR2 mapping logs after each voter's session. No persistent record |
+| Secure erasure | TEE-based memory isolation ensures mapping never reaches persistent storage. Disk sectors are cryptographically wiped (not just file-deleted) to prevent forensic recovery |
 | Watchdog observers | Independent election observers can monitor terminal behavior and audit batch broadcasts |
 
 ### 6. Sybil Attack (Fake Voter Registration)
@@ -505,6 +506,7 @@ Example: Voter A arrives at 14:30, on-chain shows Mint at 14:31, Anon at 14:32, 
 | Per-station key pairs | Each polling station has unique commissioner key pairs. One station's compromise doesn't affect others |
 | Mint count monitoring | Real-time on-chain monitoring: total minted tokens vs total station visitors. Anomalous mint spikes trigger immediate alert |
 | Seal authority separation | Seal function (Master UTXO burn) requires separate authorization from mint function |
+| Key loss recovery | HSM backup with geographically distributed key ceremony. If both keys are irrecoverably lost, minting halts at that station — other stations continue independently. Post-election recovery (release/recover) requires electionAuthority key, which is separate from commissioner keys |
 
 ### 13. Deposit Leak (Unspent Tokens)
 
@@ -581,6 +583,44 @@ Example: Voter A arrives at 14:30, on-chain shows Mint at 14:31, Anon at 14:32, 
 | Parallel paper ballot (existing) | Voter's handwritten candidate on QR2 paper provides 100% post-election detection — not statistical. Benaloh is a supplementary real-time layer |
 | System-Initiated Random Challenge (SIRC, proposal) | Replace voter-initiated challenge with system-driven: terminal commits to encrypted vote, then Kaspa block hash (unpredictable at commitment time) determines whether this is a forced challenge. Challenge rate is fixed and uniform — terminal cannot predict or selectively cheat |
 | ZK proof of correct encryption (vProgs, proposal) | Terminal outputs encrypted vote + ZK proof of encryption correctness. Every vote is deterministically verified — no challenge needed. Requires vProgs for on-chain proof verification |
+
+### 19. Vote UTXO Merge Attack (Multi-Input Destruction)
+
+**Threat**: KASTVote is uniform for all voters (same script). `vote()` enforces `tx.outputs.length == 1` and `tx.outputs[0].value == TOKEN_VAL`, but does **not** constrain `tx.inputs.length`. An attacker who controls multiple anonymous keys (via Vector 17 front-running) can combine N vote UTXOs into a single TX with 1 output — destroying N-1 votes.
+
+```
+Attack TX:
+  Inputs:  UTXO_A (0.1 KAS, cov) + UTXO_B (0.1 KAS, cov)
+  Outputs: [0] candidate_X (0.1 KAS)
+
+  Each input's vote() passes independently:
+    tx.outputs.length == 1 ✓, value == TOKEN_VAL ✓, whitelist ✓, cov == 1 ✓
+
+  Result: 2 votes consumed → 1 vote recorded. 0.1 KAS lost as fee.
+```
+
+**Countermeasures**:
+
+| Countermeasure | Implementation |
+|---|---|
+| Same-batch broadcast (existing) | Eliminates the front-running window required to acquire multiple anonymous keys (Vector 17 prerequisite) |
+| Pre-requisite difficulty | Attacker must first front-run multiple UTXOs (Vector 17), each requiring observation of an unspent UTXO in the narrow batch window |
+| Post-election audit | Paper ballot count vs on-chain vote count detects discrepancy. Missing votes trigger investigation |
+| Input count enforcement (future) | `require(tx.inputs.length == 1)` in vote() would prevent multi-input TXs. Requires Kaspa opcode support for input count introspection |
+
+### 20. Selective Voter Suppression (Mint Refusal)
+
+**Threat**: Vector 2 covers fraudulent token **inflation**. The inverse is also possible: commission intentionally **refuses or delays** minting tokens for targeted voters (political opponents, minorities, specific districts). In the JIT model, the voter's QR1 is an empty wallet — without a minted token, voting is impossible.
+
+**Countermeasures**:
+
+| Countermeasure | Implementation |
+|---|---|
+| Real-time mint monitoring | Public dashboard tracks mint count per station per hour. Anomalous drops (station active but no mints) trigger immediate alert |
+| Voter complaint channel | On-site complaint mechanism: voter who waited beyond threshold time without receiving token can formally report. Report is timestamped and tied to station |
+| Cross-station minting | If a station refuses to mint, voter can be directed to a neighboring station. Per-station key isolation (Vector 12) ensures one station's refusal doesn't block others |
+| Dual-commissioner check | Both commissioners must co-sign mint. Suppression requires both to collude. Independent commissioner appointment reduces this risk |
+| Legal framework | Intentional mint refusal constitutes election fraud under most jurisdictions. HSM audit logs provide cryptographic evidence of mint operations (or absence thereof) |
 
 ---
 
