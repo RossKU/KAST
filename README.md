@@ -8,6 +8,77 @@
 
 ---
 
+## v2 Implementation Status (Current)
+
+KAST v2 contracts have been compiled and verified with [SilverScript](https://github.com/aspect-build/silverscript). The full ZK anonymization layer (OpZkPrecompile) is not yet available in SilverScript — the current PoC uses physical QR1/QR2 anonymization at polling stations.
+
+### v2 Protocol Flow
+
+```
+[Pre]     QR1 = Empty wallet distributed (keypair only, no KAS needed)
+[Arrive]  Commission JIT-mints token → voter's QR1 wallet          ← Phase 1
+[Arrive]  Voter + Station 2-of-2 burn → anonymous QR2 issued       ← Phase 2
+[Instant] QR2 used to vote → candidate collection address           ← Phase 3
+          QR2 physically collected (like a paper ballot)
+          Sticker issued (proof of participation, not vote choice)
+[Ongoing] Commission aggregates vote UTXOs in real-time             ← Phase 4a
+[Post]    Timelock expires → KAS recovered                          ← Phase 4b
+```
+
+### v2 Key Innovations
+
+| Innovation | Impact |
+|---|---|
+| **JIT Mint** | Tokens minted on-demand at polling stations. Zero pre-mint inventory |
+| **Real-time Aggregation** | Vote UTXOs merged during election via `OpCovInputCount` + `OpCovInputIdx`. Deposit reduced from 13.75M to ~37K KAS for 50M voters |
+| **Immediate Flow** | Mint → Anon → Vote completes in ~3 minutes at the station |
+| **10 Candidates** | Whitelist expanded from 3 to 10 via `LockingBytecodeP2PK` |
+| **Voting Receipt** | On-chain participation proof for compulsory voting countries |
+
+### Compiled Contracts
+
+| Contract | File | Bytecode | ABI |
+|---|---|---|---|
+| KASTMintV2 | `kast_mint_v2.sil` | 329 bytes | `mint(sig,sig)` / `seal(sig,sig)` |
+| KASTAnonV2 | `kast_anon_v2.sil` | 96 bytes | `anonymize(sig,sig)` |
+| KASTVoteV2 | `kast_vote_v2.sil` | 488 bytes | `vote(sig,pubkey)` |
+| KASTTallyV2 | `kast_tally_v2.sil` | 4,010 bytes | `aggregate(sig)` / `release(sig)` |
+| KASTReceipt | `kast_receipt.sil` | 95 bytes | `claim(sig)` / `void(sig)` |
+
+### Cost Estimate (50M voters, TOKEN_VAL = 0.1 KAS)
+
+| | v1 (pre-mint) | v2 (JIT + aggregate) |
+|---|---|---|
+| Pre-mint inventory | 5M KAS | **0 KAS** |
+| Peak deposit (locked) | 13.75M KAS | **~37,000 KAS** |
+| Fees (consumed) | ~28,000 KAS | ~44,000 KAS |
+| **Total required** | **~25M KAS** | **~81,000 KAS** |
+
+Deposit reduction: **99.7%**. Fees increase by ~16K KAS due to storage mass on small UTXOs, but the capital efficiency improvement is overwhelming.
+
+### International Compatibility
+
+| Requirement | Countries | Status |
+|---|---|---|
+| Secret ballot | All democracies | Physical QR1→QR2 + future ZK |
+| Compulsory voting proof | 27 countries (Bolivia, Australia, etc.) | KASTReceipt (on-chain) |
+| Double-vote prevention | 90+ ink-based countries | Covenant 1 UTXO = 1 vote |
+| Mail-in voting | Many countries | Future: online Phase 2 (requires ZK) |
+| Timing analysis prevention | General | Phase 2 TX batch broadcast |
+
+### Current Limitations (PoC)
+
+| Limitation | Impact | Resolution |
+|---|---|---|
+| OpZkPrecompile (0xa6) | No cryptographic anonymization | Await SilverScript support |
+| OpTxInputDaaScore | No precise time windows | Uses `this.age` as fallback |
+| checkMultiSig | Dual checkSig workaround | Await SilverScript support |
+| MAX_AGGREGATE = 8 | Multi-pass aggregation needed | Script size limit (10KB) |
+
+See [PLAN_V2.md](PLAN_V2.md) for full v2 design documentation.
+
+---
+
 ## Motivation
 
 The goal of KAST is not to reinvent elections — it is to make the existing system tamper-proof by anchoring it to a blockchain.
@@ -319,7 +390,7 @@ Example: Voter A anonymizes at 14:32:01, votes for Candidate X at 14:32:03
 | Countermeasure | Implementation |
 |---|---|
 | Uniform TX structure | All vote TXs have identical value, fee, and script size. Eliminates pattern analysis vectors |
-| Fixed token amount | All tokens are uniformly 1 sompi |
+| Fixed token amount | All tokens are uniformly TOKEN_VAL (v2: 0.1 KAS) |
 | Unified script | Anonymous token's script_public_key uses identical structure for all voters |
 
 ---

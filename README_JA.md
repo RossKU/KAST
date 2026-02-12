@@ -8,6 +8,77 @@
 
 ---
 
+## v2 実装状況 (現在)
+
+KAST v2 コントラクトは [SilverScript](https://github.com/aspect-build/silverscript) でコンパイル・検証済み。ZK 匿名化レイヤー (OpZkPrecompile) は SilverScript に未実装のため、現在の PoC は投票所での物理的 QR1/QR2 匿名化を使用。
+
+### v2 プロトコルフロー
+
+```
+[事前]   QR1 = 空Wallet配布 (鍵ペアのみ、KAS不要)
+[来所]   選管が JIT Mint → QR1 Wallet へ送金              ← Phase 1
+[来所]   本人(QR1) + 投票所端末 の 2-of-2 Burn → QR2発行  ← Phase 2
+[即時]   QR2 で投票 → 候補者集票所アドレスへ              ← Phase 3
+         QR2 は物理回収 (投票用紙と同じ)
+         ステッカー配布 (投票済み証明、投票先は含まない)
+[随時]   選管が Vote UTXO をリアルタイム集約               ← Phase 4a
+[事後]   タイムロック解除 → KAS 全額回収                   ← Phase 4b
+```
+
+### v2 の主要イノベーション
+
+| イノベーション | 効果 |
+|---|---|
+| **JIT Mint** | 投票所来所時にオンデマンド発行。事前在庫ゼロ |
+| **リアルタイム集約** | `OpCovInputCount` + `OpCovInputIdx` で選挙中に Vote UTXO を随時マージ。5,000万人規模で預託が 1,375万 → ~37,000 KAS に |
+| **即時フロー** | Mint → Anon → Vote を投票所内で約3分で完結 |
+| **10候補者対応** | `LockingBytecodeP2PK` ホワイトリストを 3人 → 10人に拡張 |
+| **投票証明** | 義務投票国向けオンチェーン参加証明 (KASTReceipt) |
+
+### コンパイル済みコントラクト
+
+| Contract | ファイル | Bytecode | ABI |
+|---|---|---|---|
+| KASTMintV2 | `kast_mint_v2.sil` | 329 bytes | `mint(sig,sig)` / `seal(sig,sig)` |
+| KASTAnonV2 | `kast_anon_v2.sil` | 96 bytes | `anonymize(sig,sig)` |
+| KASTVoteV2 | `kast_vote_v2.sil` | 488 bytes | `vote(sig,pubkey)` |
+| KASTTallyV2 | `kast_tally_v2.sil` | 4,010 bytes | `aggregate(sig)` / `release(sig)` |
+| KASTReceipt | `kast_receipt.sil` | 95 bytes | `claim(sig)` / `void(sig)` |
+
+### コスト試算 (5,000万人規模, TOKEN_VAL = 0.1 KAS)
+
+| | v1 (事前Mint) | v2 (JIT + 集約) |
+|---|---|---|
+| 事前Mint在庫 | 500万 KAS | **0 KAS** |
+| ピーク預託 (ロック) | 1,375万 KAS | **~37,000 KAS** |
+| 手数料 (消費) | ~28,000 KAS | ~44,000 KAS |
+| **必要資金** | **~2,500万 KAS** | **~81,000 KAS** |
+
+預託削減率: **99.7%**。手数料は小 UTXO 生成の storage mass により ~16,000 KAS 増加するが、資金効率の改善が圧倒的。
+
+### 国際対応
+
+| 要件 | 対象国 | 対応状況 |
+|---|---|---|
+| 秘密投票 | 全民主国家 | QR1→QR2 物理匿名化 + 将来ZK |
+| 義務投票証明 | 27カ国 (ボリビア、豪州等) | KASTReceipt (オンチェーン) |
+| 二重投票防止 | インク方式 90カ国以上 | Covenant 1 UTXO = 1票 |
+| 郵便投票 | 多数国 | 将来: オンライン Phase 2 (ZK必須) |
+| タイミング分析防止 | 全般 | Phase 2 TX バッチ送信 |
+
+### 現在の制約 (PoC段階)
+
+| 制約 | 影響 | 解消時期 |
+|---|---|---|
+| OpZkPrecompile (0xa6) | 暗号的匿名化が不可 | SilverScript 対応待ち |
+| OpTxInputDaaScore | 厳密な時間窓制御が不可 | SilverScript 対応待ち |
+| checkMultiSig | 2つの checkSig で代替 | SilverScript 対応待ち |
+| MAX_AGGREGATE = 8 | 多段集約が必要 | スクリプトサイズ上限 (10KB) |
+
+詳細設計は [PLAN_V2.md](PLAN_V2.md) を参照。
+
+---
+
 ## モチベーション
 
 KAST の目的は選挙を再発明することではない。既存の選挙システムをブロックチェーンに固定し、**改竄不可能にすること**である。
@@ -319,7 +390,7 @@ Mint TX (選挙管理委員会がマルチシグで実行):
 | 対策 | 実装方法 |
 |---|---|
 | 均一な TX 構造 | 全投票 TX の value、手数料、スクリプトサイズを統一。パターン分析の余地を排除 |
-| 固定額の投票トークン | 全トークンが 1 sompi で統一 |
+| 固定額の投票トークン | 全トークンが TOKEN_VAL で統一 (v2: 0.1 KAS) |
 | 統一スクリプト | 匿名トークンの script_public_key を全投票者で同一構造にする |
 
 ---
