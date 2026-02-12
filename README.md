@@ -459,7 +459,7 @@ Example: Voter A arrives at 14:30, on-chain shows Mint at 14:31, Anon at 14:32, 
 
 | Countermeasure | Implementation |
 |---|---|
-| Value preservation (on-chain) | KASTTally.aggregate enforces `output.value >= sum(input.values)` via covenant. The authority **cannot** reduce the total value — any attempt is rejected by consensus |
+| Value preservation (on-chain) | KASTTally.aggregate enforces `output.value >= sum(input.values)` via covenant. The authority **cannot** reduce the total value — any attempt is rejected by consensus. **Note**: `>=` allows inflation via non-covenant inputs; v2.2 will tighten to `==` |
 | Covenant self-reference | Aggregated output must use the same KASTTally script (`this.activeBytecode`). Authority cannot redirect funds to a different address |
 | Pre-aggregation tally | Vote count is always verifiable pre-aggregation: count all covenant UTXOs at the candidate address. Aggregation is an optimization, not a requirement for counting |
 | Aggregation delay detection | If the authority delays aggregation, deposit runs low and JIT minting slows. This is publicly observable and triggers audit |
@@ -640,7 +640,7 @@ However, every piece of logic KAST requires can be expressed within the L1 scrip
 - Value preservation → `OpTxOutputAmount` verifies
 - Time window constraint → `OpTxInputDaaScore` enforces
 
-More complex logic such as encrypted tallying and liquid delegation will be addressed by vProgs (CairoVM L2) in the future.
+More complex logic such as encrypted tallying and liquid delegation is handled by vProgs (CairoVM L2).
 
 #### vProgs (L2) Security: Based Rollup Design
 
@@ -736,6 +736,10 @@ Fee breakdown: Mint 30K (69%, dominated by storage mass) + Anon 10K + Vote 3K + 
 | Candidate slots | 10 | Covers most election types |
 
 Security hardening (v2.1): exact value matching (`==` not `>=`) prevents fingerprinting, `recover` entrypoints prevent permanent deposit lock, `release` enforces covenant chain termination, and KASTReceipt is issued as a separate TX to preserve anonymization.
+
+**Open security items (v2.2)**:
+- `KASTTally.aggregate` uses `>=` for value preservation — election authority could inflate vote count by injecting non-covenant KAS into aggregate outputs. Fix: change to `==` so covenant output exactly matches covenant input sum.
+- `recover()` in KASTAnon/KASTVote lacks `OpCovOutCount(covId) == 0` — authority could create phantom covenant outputs during post-election recovery. Fix: add covenant termination check.
 
 ---
 

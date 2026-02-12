@@ -459,7 +459,7 @@ QR2用紙のデザイン:
 
 | 対策 | 実装方法 |
 |---|---|
-| 価値保全（オンチェーン） | KASTTally.aggregate は `output.value >= sum(input.values)` を Covenant で強制。選管は価値を減少させることが**不可能** — 試みはコンセンサスが拒否 |
+| 価値保全（オンチェーン） | KASTTally.aggregate は `output.value >= sum(input.values)` を Covenant で強制。選管は価値を減少させることが**不可能** — 試みはコンセンサスが拒否。**注意**: `>=` は非covenant入力による水増しを許容; v2.2 で `==` に厳格化予定 |
 | Covenant 自己参照 | 集約出力は同一 KASTTally スクリプト (`this.activeBytecode`) を使用しなければならない。選管が別アドレスに資金を流用することは不可能 |
 | 集約前の集計可能性 | 得票数は集約前でも常に検証可能: 候補者アドレスの全 covenant UTXO をカウント。集約は最適化であり、集計の必要条件ではない |
 | 集約遅延の検出 | 選管が集約を遅延させると預託が不足し JIT Mint が滞る。これは公開的に観測可能であり、監査のトリガーになる |
@@ -642,7 +642,7 @@ Kaspa の L1 スクリプトは Bitcoin Script の拡張であり、チューリ
 - トークン量の保存 → `OpTxOutputAmount` で検証
 - 時間窓の制約 → `OpTxInputDaaScore` で強制
 
-暗号化集計や委任投票など、より複雑なロジックは将来の vProgs（CairoVM L2）で対応する。
+暗号化集計や委任投票など、より複雑なロジックは vProgs（CairoVM L2）で対応する。
 
 #### vProgs (L2) のセキュリティ: Based Rollup 設計
 
@@ -738,6 +738,10 @@ KAST では 1 投票者あたり 3 TX（Mint + 匿名化 + 投票; Mint は最�
 | 候補者スロット | 10 | 主要な選挙形態をカバー |
 
 セキュリティ強化 (v2.1): value 完全一致 (`==`) でフィンガープリント防止、`recover` で未使用トークンの預託回収、`release` で covenant chain 終端を強制、KASTReceipt は匿名化を保護するため独立TX発行に変更。
+
+**未解決セキュリティ項目 (v2.2)**:
+- `KASTTally.aggregate` の value 保全が `>=` — 選管が非covenant KAS を aggregate 出力に混入して得票数を水増し可能。修正: `==` に変更し、covenant 出力が covenant 入力合計と完全一致を強制。
+- `recover()` (KASTAnon/KASTVote) に `OpCovOutCount(covId) == 0` がない — 選管が選挙後の回収時にファントム covenant 出力を作成可能。修正: covenant 終端チェックを追加。
 
 ---
 
