@@ -1,0 +1,54 @@
+pragma silverscript ^0.1.0;
+
+// ============================================================
+// KAST v2 Phase 2: Immediate Anonymization Contract
+// ============================================================
+// Locking script on each voter's identifiable token UTXO.
+//
+// v2 changes from v1:
+//   - MIN_AGE removed (JIT flow: mint and anonymize immediately)
+//   - TOKEN_VAL = 0.1 KAS
+//
+// Physical flow at polling station:
+//   1. Voter presents QR1 (identity wallet)
+//   2. Station verifies identity (off-chain)
+//   3. Commission mints token to QR1 (Phase 1)
+//   4. Voter + Station co-sign burn TX (this contract)
+//   5. Anonymous QR2 token issued (fresh keypair on terminal)
+//   6. Voter receives QR2 paper/screen
+//
+// Security model:
+//   - 2-of-2: voter key (QR1) + station terminal key
+//   - Stolen QR1 alone is useless without station co-sign
+//   - Physical handoff breaks voter<->ballot link
+//   - Batch timing: TXs buffered and broadcast in batches
+//     to prevent timing correlation on-chain
+//
+// Constructor args (per-voter, compiled individually):
+//   voterPk   = voter's public key (baked into QR1)
+//   stationPk = polling station terminal's public key
+//
+// Future: OpZkPrecompile for cryptographic anonymization
+// ============================================================
+
+contract KASTAnonV2(pubkey voterPk, pubkey stationPk) {
+    int constant TOKEN_VAL = 10000000;
+
+    entrypoint function anonymize(sig voterSig, sig stationSig) {
+        // ---- Authorization: 2-of-2 ----
+        require(checkSig(voterSig, voterPk));
+        require(checkSig(stationSig, stationPk));
+
+        // ---- Output constraints ----
+        // Exactly 1 output: the anonymous token
+        require(tx.outputs.length == 1);
+
+        // Value preservation
+        require(tx.outputs[0].value >= TOKEN_VAL);
+
+        // ---- Covenant chain ----
+        // Anonymous token continues the election covenant
+        bytes covId = OpInputCovenantId(this.activeInputIndex);
+        require(OpCovOutCount(covId) == 1);
+    }
+}

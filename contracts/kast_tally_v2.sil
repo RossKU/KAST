@@ -1,0 +1,82 @@
+pragma silverscript ^0.1.0;
+
+// ============================================================
+// KAST v2 Phase 4: Real-time Aggregation + Timelock Release
+// ============================================================
+// Locking script for candidate collection addresses.
+// Vote UTXOs arrive here during Phase 3.
+//
+// v2 changes from v1:
+//   - NEW: aggregate entrypoint for real-time UTXO merge
+//   - Reduces deposit lock from N*TOKEN_VAL to ~MAX_AGG*TOKEN_VAL
+//   - TOKEN_VAL = 0.1 KAS
+//
+// Real-time aggregation:
+//   During the election, the election authority periodically
+//   merges accumulated vote UTXOs into a single large UTXO.
+//   This frees up the locked deposit for reuse in new mints.
+//
+//   Example: 8 vote UTXOs (0.8 KAS) -> 1 UTXO (0.8 KAS)
+//
+// Tallying:
+//   Vote count = total_value_at_candidate / TOKEN_VAL
+//   (publicly verifiable on-chain)
+//
+// Constructor args (per candidate):
+//   candidatePk       = candidate's pubkey
+//   electionAuthority = commission pubkey
+//   electionEnd       = locktime after which release is allowed
+// ============================================================
+
+contract KASTTallyV2(pubkey candidatePk, pubkey electionAuthority, int electionEnd) {
+    int constant TOKEN_VAL = 10000000;
+    int constant MAX_AGG = 8;
+
+    // ----------------------------------------------------------
+    // aggregate: Merge multiple vote UTXOs into one
+    // ----------------------------------------------------------
+    // Callable during election by election authority.
+    // Takes up to MAX_AGG covenant inputs -> 1 covenant output.
+    // Value preservation enforced: output >= sum(all inputs).
+    // Output must use the same tally script (self-reference).
+    // ----------------------------------------------------------
+    entrypoint function aggregate(sig authSig) {
+        require(checkSig(authSig, electionAuthority));
+
+        bytes covId = OpInputCovenantId(this.activeInputIndex);
+
+        // Exactly 1 covenant output (the merged UTXO)
+        require(OpCovOutCount(covId) == 1);
+
+        // Output must be the same tally script
+        int outIdx = OpCovOutputIdx(covId, 0);
+        require(tx.outputs[outIdx].lockingBytecode == this.activeBytecode);
+
+        // Value preservation: output >= sum of all covenant inputs
+        int total = 0;
+        for(i, 0, MAX_AGG) {
+            if (i < OpCovInputCount(covId)) {
+                int inIdx = OpCovInputIdx(covId, i);
+                total = total + tx.inputs[inIdx].value;
+            }
+        }
+        require(tx.outputs[outIdx].value >= total);
+    }
+
+    // ----------------------------------------------------------
+    // release: Post-election KAS recovery
+    // ----------------------------------------------------------
+    // Only callable after election period ends.
+    // Authority recovers the deposited KAS.
+    // ----------------------------------------------------------
+    entrypoint function release(sig authSig) {
+        require(checkSig(authSig, electionAuthority));
+
+        // Timelock: election must have ended
+        require(tx.time >= electionEnd);
+
+        // Value preservation on release
+        int inputVal = tx.inputs[this.activeInputIndex].value;
+        require(tx.outputs[0].value >= inputVal);
+    }
+}

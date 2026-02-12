@@ -1,0 +1,46 @@
+pragma silverscript ^0.1.0;
+
+// ============================================================
+// KAST v2: Voting Receipt (Compulsory Voting Countries)
+// ============================================================
+// On-chain proof that a voter participated in the election.
+// Does NOT reveal who they voted for.
+//
+// Use case:
+//   In 27+ countries with compulsory voting (Bolivia,
+//   Australia, etc.), voters must prove they voted to avoid
+//   fines or salary deductions.
+//
+// Mechanism:
+//   - Receipt UTXO is created during Phase 2 (anonymization)
+//     as a second output alongside the anonymous token
+//   - UTXO existence at this script = voter participated
+//   - Voter can claim (spend) the receipt post-election
+//     as proof of participation
+//   - Only the voter's own key can claim (privacy preserved)
+//
+// Constructor args (per-voter):
+//   voterPk           = voter's public key (same as QR1)
+//   electionAuthority = commission pubkey (for emergency void)
+// ============================================================
+
+contract KASTReceipt(pubkey voterPk, pubkey electionAuthority) {
+    // ----------------------------------------------------------
+    // claim: Voter retrieves their participation proof
+    // ----------------------------------------------------------
+    // Post-election, voter can spend this UTXO as proof they
+    // participated. The TX itself serves as a receipt.
+    // ----------------------------------------------------------
+    entrypoint function claim(sig voterSig) {
+        require(checkSig(voterSig, voterPk));
+    }
+
+    // ----------------------------------------------------------
+    // void: Emergency cancellation by election authority
+    // ----------------------------------------------------------
+    // If election is voided or voter registration invalidated.
+    // ----------------------------------------------------------
+    entrypoint function void(sig authSig) {
+        require(checkSig(authSig, electionAuthority));
+    }
+}

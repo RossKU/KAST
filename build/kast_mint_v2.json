@@ -1,0 +1,872 @@
+{
+  "contract_name": "KASTMintV2",
+  "script": [
+    118,
+    0,
+    156,
+    99,
+    117,
+    81,
+    121,
+    32,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    172,
+    105,
+    0,
+    121,
+    32,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    172,
+    105,
+    180,
+    82,
+    162,
+    105,
+    180,
+    84,
+    81,
+    147,
+    161,
+    105,
+    0,
+    180,
+    81,
+    148,
+    159,
+    99,
+    0,
+    194,
+    4,
+    128,
+    150,
+    152,
+    0,
+    156,
+    105,
+    104,
+    81,
+    180,
+    81,
+    148,
+    159,
+    99,
+    81,
+    194,
+    4,
+    128,
+    150,
+    152,
+    0,
+    156,
+    105,
+    104,
+    82,
+    180,
+    81,
+    148,
+    159,
+    99,
+    82,
+    194,
+    4,
+    128,
+    150,
+    152,
+    0,
+    156,
+    105,
+    104,
+    83,
+    180,
+    81,
+    148,
+    159,
+    99,
+    83,
+    194,
+    4,
+    128,
+    150,
+    152,
+    0,
+    156,
+    105,
+    104,
+    180,
+    81,
+    148,
+    195,
+    185,
+    191,
+    135,
+    105,
+    185,
+    207,
+    210,
+    180,
+    156,
+    105,
+    117,
+    117,
+    81,
+    103,
+    118,
+    81,
+    156,
+    99,
+    117,
+    81,
+    121,
+    32,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    172,
+    105,
+    0,
+    121,
+    32,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    2,
+    172,
+    105,
+    180,
+    81,
+    162,
+    105,
+    180,
+    84,
+    161,
+    105,
+    0,
+    180,
+    159,
+    99,
+    0,
+    194,
+    4,
+    128,
+    150,
+    152,
+    0,
+    156,
+    105,
+    104,
+    81,
+    180,
+    159,
+    99,
+    81,
+    194,
+    4,
+    128,
+    150,
+    152,
+    0,
+    156,
+    105,
+    104,
+    82,
+    180,
+    159,
+    99,
+    82,
+    194,
+    4,
+    128,
+    150,
+    152,
+    0,
+    156,
+    105,
+    104,
+    83,
+    180,
+    159,
+    99,
+    83,
+    194,
+    4,
+    128,
+    150,
+    152,
+    0,
+    156,
+    105,
+    104,
+    185,
+    207,
+    210,
+    180,
+    156,
+    105,
+    117,
+    117,
+    81,
+    103,
+    117,
+    0,
+    105,
+    104,
+    104
+  ],
+  "ast": {
+    "name": "KASTMintV2",
+    "params": [
+      {
+        "type_name": "pubkey",
+        "name": "commissioner1"
+      },
+      {
+        "type_name": "pubkey",
+        "name": "commissioner2"
+      }
+    ],
+    "constants": {
+      "MAX_BATCH": {
+        "kind": "int",
+        "data": 4
+      },
+      "TOKEN_VAL": {
+        "kind": "int",
+        "data": 10000000
+      }
+    },
+    "functions": [
+      {
+        "name": "mint",
+        "params": [
+          {
+            "type_name": "sig",
+            "name": "sig1"
+          },
+          {
+            "type_name": "sig",
+            "name": "sig2"
+          }
+        ],
+        "entrypoint": true,
+        "return_types": [],
+        "body": [
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "call",
+                "data": {
+                  "name": "checkSig",
+                  "args": [
+                    {
+                      "kind": "identifier",
+                      "data": "sig1"
+                    },
+                    {
+                      "kind": "identifier",
+                      "data": "commissioner1"
+                    }
+                  ]
+                }
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "call",
+                "data": {
+                  "name": "checkSig",
+                  "args": [
+                    {
+                      "kind": "identifier",
+                      "data": "sig2"
+                    },
+                    {
+                      "kind": "identifier",
+                      "data": "commissioner2"
+                    }
+                  ]
+                }
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "binary",
+                "data": {
+                  "op": "ge",
+                  "left": {
+                    "kind": "nullary",
+                    "data": "tx_outputs_length"
+                  },
+                  "right": {
+                    "kind": "int",
+                    "data": 2
+                  }
+                }
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "binary",
+                "data": {
+                  "op": "le",
+                  "left": {
+                    "kind": "nullary",
+                    "data": "tx_outputs_length"
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "data": {
+                      "op": "add",
+                      "left": {
+                        "kind": "identifier",
+                        "data": "MAX_BATCH"
+                      },
+                      "right": {
+                        "kind": "int",
+                        "data": 1
+                      }
+                    }
+                  }
+                }
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "int",
+              "modifiers": [],
+              "name": "tokenCount",
+              "expr": {
+                "kind": "binary",
+                "data": {
+                  "op": "sub",
+                  "left": {
+                    "kind": "nullary",
+                    "data": "tx_outputs_length"
+                  },
+                  "right": {
+                    "kind": "int",
+                    "data": 1
+                  }
+                }
+              }
+            }
+          },
+          {
+            "kind": "for",
+            "data": {
+              "ident": "i",
+              "start": {
+                "kind": "int",
+                "data": 0
+              },
+              "end": {
+                "kind": "identifier",
+                "data": "MAX_BATCH"
+              },
+              "body": [
+                {
+                  "kind": "if",
+                  "data": {
+                    "condition": {
+                      "kind": "binary",
+                      "data": {
+                        "op": "lt",
+                        "left": {
+                          "kind": "identifier",
+                          "data": "i"
+                        },
+                        "right": {
+                          "kind": "identifier",
+                          "data": "tokenCount"
+                        }
+                      }
+                    },
+                    "then_branch": [
+                      {
+                        "kind": "require",
+                        "data": {
+                          "expr": {
+                            "kind": "binary",
+                            "data": {
+                              "op": "eq",
+                              "left": {
+                                "kind": "introspection",
+                                "data": {
+                                  "kind": "output_value",
+                                  "index": {
+                                    "kind": "identifier",
+                                    "data": "i"
+                                  }
+                                }
+                              },
+                              "right": {
+                                "kind": "identifier",
+                                "data": "TOKEN_VAL"
+                              }
+                            }
+                          },
+                          "message": null
+                        }
+                      }
+                    ],
+                    "else_branch": null
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "binary",
+                "data": {
+                  "op": "eq",
+                  "left": {
+                    "kind": "introspection",
+                    "data": {
+                      "kind": "output_locking_bytecode",
+                      "index": {
+                        "kind": "identifier",
+                        "data": "tokenCount"
+                      }
+                    }
+                  },
+                  "right": {
+                    "kind": "nullary",
+                    "data": "active_bytecode"
+                  }
+                }
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "bytes",
+              "modifiers": [],
+              "name": "covId",
+              "expr": {
+                "kind": "call",
+                "data": {
+                  "name": "OpInputCovenantId",
+                  "args": [
+                    {
+                      "kind": "nullary",
+                      "data": "active_input_index"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "binary",
+                "data": {
+                  "op": "eq",
+                  "left": {
+                    "kind": "call",
+                    "data": {
+                      "name": "OpCovOutCount",
+                      "args": [
+                        {
+                          "kind": "identifier",
+                          "data": "covId"
+                        }
+                      ]
+                    }
+                  },
+                  "right": {
+                    "kind": "nullary",
+                    "data": "tx_outputs_length"
+                  }
+                }
+              },
+              "message": null
+            }
+          }
+        ]
+      },
+      {
+        "name": "seal",
+        "params": [
+          {
+            "type_name": "sig",
+            "name": "sig1"
+          },
+          {
+            "type_name": "sig",
+            "name": "sig2"
+          }
+        ],
+        "entrypoint": true,
+        "return_types": [],
+        "body": [
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "call",
+                "data": {
+                  "name": "checkSig",
+                  "args": [
+                    {
+                      "kind": "identifier",
+                      "data": "sig1"
+                    },
+                    {
+                      "kind": "identifier",
+                      "data": "commissioner1"
+                    }
+                  ]
+                }
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "call",
+                "data": {
+                  "name": "checkSig",
+                  "args": [
+                    {
+                      "kind": "identifier",
+                      "data": "sig2"
+                    },
+                    {
+                      "kind": "identifier",
+                      "data": "commissioner2"
+                    }
+                  ]
+                }
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "binary",
+                "data": {
+                  "op": "ge",
+                  "left": {
+                    "kind": "nullary",
+                    "data": "tx_outputs_length"
+                  },
+                  "right": {
+                    "kind": "int",
+                    "data": 1
+                  }
+                }
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "binary",
+                "data": {
+                  "op": "le",
+                  "left": {
+                    "kind": "nullary",
+                    "data": "tx_outputs_length"
+                  },
+                  "right": {
+                    "kind": "identifier",
+                    "data": "MAX_BATCH"
+                  }
+                }
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "for",
+            "data": {
+              "ident": "i",
+              "start": {
+                "kind": "int",
+                "data": 0
+              },
+              "end": {
+                "kind": "identifier",
+                "data": "MAX_BATCH"
+              },
+              "body": [
+                {
+                  "kind": "if",
+                  "data": {
+                    "condition": {
+                      "kind": "binary",
+                      "data": {
+                        "op": "lt",
+                        "left": {
+                          "kind": "identifier",
+                          "data": "i"
+                        },
+                        "right": {
+                          "kind": "nullary",
+                          "data": "tx_outputs_length"
+                        }
+                      }
+                    },
+                    "then_branch": [
+                      {
+                        "kind": "require",
+                        "data": {
+                          "expr": {
+                            "kind": "binary",
+                            "data": {
+                              "op": "eq",
+                              "left": {
+                                "kind": "introspection",
+                                "data": {
+                                  "kind": "output_value",
+                                  "index": {
+                                    "kind": "identifier",
+                                    "data": "i"
+                                  }
+                                }
+                              },
+                              "right": {
+                                "kind": "identifier",
+                                "data": "TOKEN_VAL"
+                              }
+                            }
+                          },
+                          "message": null
+                        }
+                      }
+                    ],
+                    "else_branch": null
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "bytes",
+              "modifiers": [],
+              "name": "covId",
+              "expr": {
+                "kind": "call",
+                "data": {
+                  "name": "OpInputCovenantId",
+                  "args": [
+                    {
+                      "kind": "nullary",
+                      "data": "active_input_index"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "binary",
+                "data": {
+                  "op": "eq",
+                  "left": {
+                    "kind": "call",
+                    "data": {
+                      "name": "OpCovOutCount",
+                      "args": [
+                        {
+                          "kind": "identifier",
+                          "data": "covId"
+                        }
+                      ]
+                    }
+                  },
+                  "right": {
+                    "kind": "nullary",
+                    "data": "tx_outputs_length"
+                  }
+                }
+              },
+              "message": null
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "abi": [
+    {
+      "name": "mint",
+      "inputs": [
+        {
+          "name": "sig1",
+          "type_name": "sig"
+        },
+        {
+          "name": "sig2",
+          "type_name": "sig"
+        }
+      ]
+    },
+    {
+      "name": "seal",
+      "inputs": [
+        {
+          "name": "sig1",
+          "type_name": "sig"
+        },
+        {
+          "name": "sig2",
+          "type_name": "sig"
+        }
+      ]
+    }
+  ],
+  "without_selector": false
+}

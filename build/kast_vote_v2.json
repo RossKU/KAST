@@ -1,0 +1,1113 @@
+{
+  "contract_name": "KASTVoteV2",
+  "script": [
+    81,
+    121,
+    81,
+    121,
+    172,
+    105,
+    180,
+    81,
+    156,
+    105,
+    0,
+    194,
+    4,
+    128,
+    150,
+    152,
+    0,
+    162,
+    105,
+    0,
+    195,
+    32,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    10,
+    3,
+    0,
+    0,
+    32,
+    124,
+    126,
+    1,
+    172,
+    126,
+    135,
+    0,
+    195,
+    32,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    11,
+    3,
+    0,
+    0,
+    32,
+    124,
+    126,
+    1,
+    172,
+    126,
+    135,
+    155,
+    0,
+    195,
+    32,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    3,
+    0,
+    0,
+    32,
+    124,
+    126,
+    1,
+    172,
+    126,
+    135,
+    155,
+    0,
+    195,
+    32,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    3,
+    0,
+    0,
+    32,
+    124,
+    126,
+    1,
+    172,
+    126,
+    135,
+    155,
+    0,
+    195,
+    32,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    14,
+    3,
+    0,
+    0,
+    32,
+    124,
+    126,
+    1,
+    172,
+    126,
+    135,
+    155,
+    0,
+    195,
+    32,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    15,
+    3,
+    0,
+    0,
+    32,
+    124,
+    126,
+    1,
+    172,
+    126,
+    135,
+    155,
+    0,
+    195,
+    32,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    16,
+    3,
+    0,
+    0,
+    32,
+    124,
+    126,
+    1,
+    172,
+    126,
+    135,
+    155,
+    0,
+    195,
+    32,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    17,
+    3,
+    0,
+    0,
+    32,
+    124,
+    126,
+    1,
+    172,
+    126,
+    135,
+    155,
+    0,
+    195,
+    32,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    18,
+    3,
+    0,
+    0,
+    32,
+    124,
+    126,
+    1,
+    172,
+    126,
+    135,
+    155,
+    0,
+    195,
+    32,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    19,
+    3,
+    0,
+    0,
+    32,
+    124,
+    126,
+    1,
+    172,
+    126,
+    135,
+    155,
+    105,
+    185,
+    207,
+    210,
+    81,
+    156,
+    105,
+    117,
+    117,
+    81
+  ],
+  "ast": {
+    "name": "KASTVoteV2",
+    "params": [
+      {
+        "type_name": "pubkey",
+        "name": "cand0"
+      },
+      {
+        "type_name": "pubkey",
+        "name": "cand1"
+      },
+      {
+        "type_name": "pubkey",
+        "name": "cand2"
+      },
+      {
+        "type_name": "pubkey",
+        "name": "cand3"
+      },
+      {
+        "type_name": "pubkey",
+        "name": "cand4"
+      },
+      {
+        "type_name": "pubkey",
+        "name": "cand5"
+      },
+      {
+        "type_name": "pubkey",
+        "name": "cand6"
+      },
+      {
+        "type_name": "pubkey",
+        "name": "cand7"
+      },
+      {
+        "type_name": "pubkey",
+        "name": "cand8"
+      },
+      {
+        "type_name": "pubkey",
+        "name": "cand9"
+      }
+    ],
+    "constants": {
+      "TOKEN_VAL": {
+        "kind": "int",
+        "data": 10000000
+      }
+    },
+    "functions": [
+      {
+        "name": "vote",
+        "params": [
+          {
+            "type_name": "sig",
+            "name": "anonSig"
+          },
+          {
+            "type_name": "pubkey",
+            "name": "anonPk"
+          }
+        ],
+        "entrypoint": true,
+        "return_types": [],
+        "body": [
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "call",
+                "data": {
+                  "name": "checkSig",
+                  "args": [
+                    {
+                      "kind": "identifier",
+                      "data": "anonSig"
+                    },
+                    {
+                      "kind": "identifier",
+                      "data": "anonPk"
+                    }
+                  ]
+                }
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "binary",
+                "data": {
+                  "op": "eq",
+                  "left": {
+                    "kind": "nullary",
+                    "data": "tx_outputs_length"
+                  },
+                  "right": {
+                    "kind": "int",
+                    "data": 1
+                  }
+                }
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "binary",
+                "data": {
+                  "op": "ge",
+                  "left": {
+                    "kind": "introspection",
+                    "data": {
+                      "kind": "output_value",
+                      "index": {
+                        "kind": "int",
+                        "data": 0
+                      }
+                    }
+                  },
+                  "right": {
+                    "kind": "identifier",
+                    "data": "TOKEN_VAL"
+                  }
+                }
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "bytes34",
+              "modifiers": [],
+              "name": "lock0",
+              "expr": {
+                "kind": "new",
+                "data": {
+                  "name": "LockingBytecodeP2PK",
+                  "args": [
+                    {
+                      "kind": "identifier",
+                      "data": "cand0"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "bytes34",
+              "modifiers": [],
+              "name": "lock1",
+              "expr": {
+                "kind": "new",
+                "data": {
+                  "name": "LockingBytecodeP2PK",
+                  "args": [
+                    {
+                      "kind": "identifier",
+                      "data": "cand1"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "bytes34",
+              "modifiers": [],
+              "name": "lock2",
+              "expr": {
+                "kind": "new",
+                "data": {
+                  "name": "LockingBytecodeP2PK",
+                  "args": [
+                    {
+                      "kind": "identifier",
+                      "data": "cand2"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "bytes34",
+              "modifiers": [],
+              "name": "lock3",
+              "expr": {
+                "kind": "new",
+                "data": {
+                  "name": "LockingBytecodeP2PK",
+                  "args": [
+                    {
+                      "kind": "identifier",
+                      "data": "cand3"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "bytes34",
+              "modifiers": [],
+              "name": "lock4",
+              "expr": {
+                "kind": "new",
+                "data": {
+                  "name": "LockingBytecodeP2PK",
+                  "args": [
+                    {
+                      "kind": "identifier",
+                      "data": "cand4"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "bytes34",
+              "modifiers": [],
+              "name": "lock5",
+              "expr": {
+                "kind": "new",
+                "data": {
+                  "name": "LockingBytecodeP2PK",
+                  "args": [
+                    {
+                      "kind": "identifier",
+                      "data": "cand5"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "bytes34",
+              "modifiers": [],
+              "name": "lock6",
+              "expr": {
+                "kind": "new",
+                "data": {
+                  "name": "LockingBytecodeP2PK",
+                  "args": [
+                    {
+                      "kind": "identifier",
+                      "data": "cand6"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "bytes34",
+              "modifiers": [],
+              "name": "lock7",
+              "expr": {
+                "kind": "new",
+                "data": {
+                  "name": "LockingBytecodeP2PK",
+                  "args": [
+                    {
+                      "kind": "identifier",
+                      "data": "cand7"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "bytes34",
+              "modifiers": [],
+              "name": "lock8",
+              "expr": {
+                "kind": "new",
+                "data": {
+                  "name": "LockingBytecodeP2PK",
+                  "args": [
+                    {
+                      "kind": "identifier",
+                      "data": "cand8"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "bytes34",
+              "modifiers": [],
+              "name": "lock9",
+              "expr": {
+                "kind": "new",
+                "data": {
+                  "name": "LockingBytecodeP2PK",
+                  "args": [
+                    {
+                      "kind": "identifier",
+                      "data": "cand9"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "bytes",
+              "modifiers": [],
+              "name": "outScript",
+              "expr": {
+                "kind": "introspection",
+                "data": {
+                  "kind": "output_locking_bytecode",
+                  "index": {
+                    "kind": "int",
+                    "data": 0
+                  }
+                }
+              }
+            }
+          },
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "binary",
+                "data": {
+                  "op": "or",
+                  "left": {
+                    "kind": "binary",
+                    "data": {
+                      "op": "or",
+                      "left": {
+                        "kind": "binary",
+                        "data": {
+                          "op": "or",
+                          "left": {
+                            "kind": "binary",
+                            "data": {
+                              "op": "or",
+                              "left": {
+                                "kind": "binary",
+                                "data": {
+                                  "op": "or",
+                                  "left": {
+                                    "kind": "binary",
+                                    "data": {
+                                      "op": "or",
+                                      "left": {
+                                        "kind": "binary",
+                                        "data": {
+                                          "op": "or",
+                                          "left": {
+                                            "kind": "binary",
+                                            "data": {
+                                              "op": "or",
+                                              "left": {
+                                                "kind": "binary",
+                                                "data": {
+                                                  "op": "or",
+                                                  "left": {
+                                                    "kind": "binary",
+                                                    "data": {
+                                                      "op": "eq",
+                                                      "left": {
+                                                        "kind": "identifier",
+                                                        "data": "outScript"
+                                                      },
+                                                      "right": {
+                                                        "kind": "identifier",
+                                                        "data": "lock0"
+                                                      }
+                                                    }
+                                                  },
+                                                  "right": {
+                                                    "kind": "binary",
+                                                    "data": {
+                                                      "op": "eq",
+                                                      "left": {
+                                                        "kind": "identifier",
+                                                        "data": "outScript"
+                                                      },
+                                                      "right": {
+                                                        "kind": "identifier",
+                                                        "data": "lock1"
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              },
+                                              "right": {
+                                                "kind": "binary",
+                                                "data": {
+                                                  "op": "eq",
+                                                  "left": {
+                                                    "kind": "identifier",
+                                                    "data": "outScript"
+                                                  },
+                                                  "right": {
+                                                    "kind": "identifier",
+                                                    "data": "lock2"
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          },
+                                          "right": {
+                                            "kind": "binary",
+                                            "data": {
+                                              "op": "eq",
+                                              "left": {
+                                                "kind": "identifier",
+                                                "data": "outScript"
+                                              },
+                                              "right": {
+                                                "kind": "identifier",
+                                                "data": "lock3"
+                                              }
+                                            }
+                                          }
+                                        }
+                                      },
+                                      "right": {
+                                        "kind": "binary",
+                                        "data": {
+                                          "op": "eq",
+                                          "left": {
+                                            "kind": "identifier",
+                                            "data": "outScript"
+                                          },
+                                          "right": {
+                                            "kind": "identifier",
+                                            "data": "lock4"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "right": {
+                                    "kind": "binary",
+                                    "data": {
+                                      "op": "eq",
+                                      "left": {
+                                        "kind": "identifier",
+                                        "data": "outScript"
+                                      },
+                                      "right": {
+                                        "kind": "identifier",
+                                        "data": "lock5"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "right": {
+                                "kind": "binary",
+                                "data": {
+                                  "op": "eq",
+                                  "left": {
+                                    "kind": "identifier",
+                                    "data": "outScript"
+                                  },
+                                  "right": {
+                                    "kind": "identifier",
+                                    "data": "lock6"
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "right": {
+                            "kind": "binary",
+                            "data": {
+                              "op": "eq",
+                              "left": {
+                                "kind": "identifier",
+                                "data": "outScript"
+                              },
+                              "right": {
+                                "kind": "identifier",
+                                "data": "lock7"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "right": {
+                        "kind": "binary",
+                        "data": {
+                          "op": "eq",
+                          "left": {
+                            "kind": "identifier",
+                            "data": "outScript"
+                          },
+                          "right": {
+                            "kind": "identifier",
+                            "data": "lock8"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "right": {
+                    "kind": "binary",
+                    "data": {
+                      "op": "eq",
+                      "left": {
+                        "kind": "identifier",
+                        "data": "outScript"
+                      },
+                      "right": {
+                        "kind": "identifier",
+                        "data": "lock9"
+                      }
+                    }
+                  }
+                }
+              },
+              "message": null
+            }
+          },
+          {
+            "kind": "variable_definition",
+            "data": {
+              "type_name": "bytes",
+              "modifiers": [],
+              "name": "covId",
+              "expr": {
+                "kind": "call",
+                "data": {
+                  "name": "OpInputCovenantId",
+                  "args": [
+                    {
+                      "kind": "nullary",
+                      "data": "active_input_index"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "kind": "require",
+            "data": {
+              "expr": {
+                "kind": "binary",
+                "data": {
+                  "op": "eq",
+                  "left": {
+                    "kind": "call",
+                    "data": {
+                      "name": "OpCovOutCount",
+                      "args": [
+                        {
+                          "kind": "identifier",
+                          "data": "covId"
+                        }
+                      ]
+                    }
+                  },
+                  "right": {
+                    "kind": "int",
+                    "data": 1
+                  }
+                }
+              },
+              "message": null
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "abi": [
+    {
+      "name": "vote",
+      "inputs": [
+        {
+          "name": "anonSig",
+          "type_name": "sig"
+        },
+        {
+          "name": "anonPk",
+          "type_name": "pubkey"
+        }
+      ]
+    }
+  ],
+  "without_selector": true
+}

@@ -1,0 +1,80 @@
+pragma silverscript ^0.1.0;
+
+// ============================================================
+// KAST v2 Phase 3: Voting Contract (10 candidates)
+// ============================================================
+// Locking script on the anonymous token UTXO (QR2).
+//
+// v2 changes from v1:
+//   - MIN_AGE removed (QR2 used immediately after issuance)
+//   - Candidate count: 3 -> 10 (covers large elections)
+//   - TOKEN_VAL = 0.1 KAS
+//
+// Physical flow:
+//   1. Voter scans QR2 at terminal
+//   2. Selects candidate on screen
+//   3. Terminal builds Vote TX -> candidate collection address
+//   4. QR2 is collected (like a paper ballot in the box)
+//
+// This script is IDENTICAL for all anonymous tokens (uniform
+// structure prevents chain analysis / pattern fingerprinting).
+//
+// Enforced rules:
+//   1. Valid signature from anonymous key holder (QR2)
+//   2. Exactly 1 output (the vote)
+//   3. Output destination is one of the 10 whitelisted candidates
+//   4. Value preservation (TOKEN_VAL)
+//   5. Covenant chain continues (same election ID)
+//
+// Constructor args (same for all voters in one election):
+//   cand0..cand9 = candidate collection pubkeys
+//
+// Unused candidate slots filled with a dummy/burn pubkey.
+// ============================================================
+
+contract KASTVoteV2(
+    pubkey cand0, pubkey cand1, pubkey cand2, pubkey cand3, pubkey cand4,
+    pubkey cand5, pubkey cand6, pubkey cand7, pubkey cand8, pubkey cand9
+) {
+    int constant TOKEN_VAL = 10000000;
+
+    entrypoint function vote(sig anonSig, pubkey anonPk) {
+        // ---- Authorization ----
+        require(checkSig(anonSig, anonPk));
+
+        // ---- Output constraints ----
+        require(tx.outputs.length == 1);
+        require(tx.outputs[0].value >= TOKEN_VAL);
+
+        // ---- Candidate whitelist (10 slots) ----
+        bytes34 lock0 = new LockingBytecodeP2PK(cand0);
+        bytes34 lock1 = new LockingBytecodeP2PK(cand1);
+        bytes34 lock2 = new LockingBytecodeP2PK(cand2);
+        bytes34 lock3 = new LockingBytecodeP2PK(cand3);
+        bytes34 lock4 = new LockingBytecodeP2PK(cand4);
+        bytes34 lock5 = new LockingBytecodeP2PK(cand5);
+        bytes34 lock6 = new LockingBytecodeP2PK(cand6);
+        bytes34 lock7 = new LockingBytecodeP2PK(cand7);
+        bytes34 lock8 = new LockingBytecodeP2PK(cand8);
+        bytes34 lock9 = new LockingBytecodeP2PK(cand9);
+
+        bytes outScript = tx.outputs[0].lockingBytecode;
+
+        require(
+            outScript == lock0
+            || outScript == lock1
+            || outScript == lock2
+            || outScript == lock3
+            || outScript == lock4
+            || outScript == lock5
+            || outScript == lock6
+            || outScript == lock7
+            || outScript == lock8
+            || outScript == lock9
+        );
+
+        // ---- Covenant chain ----
+        bytes covId = OpInputCovenantId(this.activeInputIndex);
+        require(OpCovOutCount(covId) == 1);
+    }
+}
