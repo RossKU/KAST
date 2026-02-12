@@ -8,77 +8,6 @@
 
 ---
 
-## v2 実装状況 (現在)
-
-KAST v2 コントラクトは [SilverScript](https://github.com/aspect-build/silverscript) でコンパイル・検証済み。ZK 匿名化レイヤー (OpZkPrecompile) は SilverScript に未実装のため、現在の PoC は投票所での物理的 QR1/QR2 匿名化を使用。
-
-### v2 プロトコルフロー
-
-```
-[事前]   QR1 = 空Wallet配布 (鍵ペアのみ、KAS不要)
-[来所]   選管が JIT Mint → QR1 Wallet へ送金              ← Phase 1
-[来所]   本人(QR1) + 投票所端末 の 2-of-2 Burn → QR2発行  ← Phase 2
-[即時]   QR2 で投票 → 候補者集票所アドレスへ              ← Phase 3
-         QR2 は物理回収 (投票用紙と同じ)
-         ステッカー配布 (投票済み証明、投票先は含まない)
-[随時]   選管が Vote UTXO をリアルタイム集約               ← Phase 4a
-[事後]   タイムロック解除 → KAS 全額回収                   ← Phase 4b
-```
-
-### v2 の主要イノベーション
-
-| イノベーション | 効果 |
-|---|---|
-| **JIT Mint** | 投票所来所時にオンデマンド発行。事前在庫ゼロ |
-| **リアルタイム集約** | `OpCovInputCount` + `OpCovInputIdx` で選挙中に Vote UTXO を随時マージ。5,000万人規模で預託が 1,375万 → ~37,000 KAS に |
-| **即時フロー** | Mint → Anon → Vote を投票所内で約3分で完結 |
-| **10候補者対応** | `LockingBytecodeP2PK` ホワイトリストを 3人 → 10人に拡張 |
-| **投票証明** | 義務投票国向けオンチェーン参加証明 (KASTReceipt) |
-
-### コンパイル済みコントラクト
-
-| Contract | ファイル | Bytecode | ABI |
-|---|---|---|---|
-| KASTMintV2 | `kast_mint_v2.sil` | 329 bytes | `mint(sig,sig)` / `seal(sig,sig)` |
-| KASTAnonV2 | `kast_anon_v2.sil` | 96 bytes | `anonymize(sig,sig)` |
-| KASTVoteV2 | `kast_vote_v2.sil` | 488 bytes | `vote(sig,pubkey)` |
-| KASTTallyV2 | `kast_tally_v2.sil` | 4,010 bytes | `aggregate(sig)` / `release(sig)` |
-| KASTReceipt | `kast_receipt.sil` | 95 bytes | `claim(sig)` / `void(sig)` |
-
-### コスト試算 (5,000万人規模, TOKEN_VAL = 0.1 KAS)
-
-| | v1 (事前Mint) | v2 (JIT + 集約) |
-|---|---|---|
-| 事前Mint在庫 | 500万 KAS | **0 KAS** |
-| ピーク預託 (ロック) | 1,375万 KAS | **~37,000 KAS** |
-| 手数料 (消費) | ~28,000 KAS | ~44,000 KAS |
-| **必要資金** | **~2,500万 KAS** | **~81,000 KAS** |
-
-預託削減率: **99.7%**。手数料は小 UTXO 生成の storage mass により ~16,000 KAS 増加するが、資金効率の改善が圧倒的。
-
-### 国際対応
-
-| 要件 | 対象国 | 対応状況 |
-|---|---|---|
-| 秘密投票 | 全民主国家 | QR1→QR2 物理匿名化 + 将来ZK |
-| 義務投票証明 | 27カ国 (ボリビア、豪州等) | KASTReceipt (オンチェーン) |
-| 二重投票防止 | インク方式 90カ国以上 | Covenant 1 UTXO = 1票 |
-| 郵便投票 | 多数国 | 将来: オンライン Phase 2 (ZK必須) |
-| タイミング分析防止 | 全般 | Phase 2 TX バッチ送信 |
-
-### 現在の制約 (PoC段階)
-
-| 制約 | 影響 | 解消時期 |
-|---|---|---|
-| OpZkPrecompile (0xa6) | 暗号的匿名化が不可 | SilverScript 対応待ち |
-| OpTxInputDaaScore | 厳密な時間窓制御が不可 | SilverScript 対応待ち |
-| checkMultiSig | 2つの checkSig で代替 | SilverScript 対応待ち |
-| MAX_AGGREGATE = 8 | 多段集約が必要 | スクリプトサイズ上限 (10KB) |
-
-詳細設計は [PLAN_V2.md](PLAN_V2.md) を参照。
-
----
-
 ## モチベーション
 
 KAST の目的は選挙を再発明することではない。既存の選挙システムをブロックチェーンに固定し、**改竄不可能にすること**である。
@@ -134,7 +63,7 @@ Transaction 構造（変更なし）:
     signature_script     ← 署名 + ZK proof データ（バイナリ push）
 
   TransactionOutput:
-    value                ← 最小値 (1 sompi)
+    value                ← TOKEN_VAL (0.1 KAS)
     script_public_key    ← Covenant ルール（投票制約スクリプト）
     covenant             ← Option<CovenantBinding>
       authorizing_input  ← 認可する入力のインデックス
@@ -145,144 +74,205 @@ Transaction 構造（変更なし）:
 
 ## プロトコルフロー
 
+```
+[事前]
+  QR1 を各有権者に配布 (空Wallet = 鍵ペアのみ、KAS不要)
+  Election Genesis TX で Master UTXO を生成 (一意な covenant_id)
+
+[投票日 — 投票所にて、1人あたり約3分]
+  Phase 1: 選管が JIT Mint → 投票者のウォレットへ送金       (KASTMint)
+  Phase 2: 投票者 + 端末の 2-of-2 で Burn → 匿名QR2発行    (KASTAnon)
+  Phase 3: QR2 で投票 → 候補者集票アドレスへ                (KASTVote)
+           QR2 は物理回収 (投票用紙と同じ)
+           ステッカー / 投票証明を配布
+
+[投票中 — バックグラウンド]
+  Phase 4a: 選管が Vote UTXO をリアルタイム集約             (KASTTally.aggregate)
+
+[事後]
+  Phase 4b: タイムロック解除 → KAS 全額回収                 (KASTTally.release)
+  集計:     候補者アドレスの total_value / TOKEN_VAL = 得票数
+```
+
 ### Phase 0: 選挙セットアップ
 
 ```
 選挙管理委員会:
-  ① 有権者名簿から Merkle tree を構築
-     リーフ = 各有権者の公開鍵
-  ② Election Genesis TX を発行
+  ① Election Genesis TX を発行
      Output: Election Master UTXO
        covenant_id: Hash(outpoint + outputs) ← 選挙の一意な ID
-       script_public_key: [Merkle root, 候補者リスト, 選挙ルール]
-  ③ Merkle root と tree サイズをオンチェーンにコミット（公開情報）
+  ② 各有権者に QR1 を生成・配布
+     QR1 = 鍵ペアのみ (空ウォレット、KAS は不要)
+     秘密鍵を QR コード化して配布
+  ③ 有権者名簿から Merkle tree を構築 (将来の ZK 検証用)
+     Merkle root をオンチェーンにコミット（公開情報）
 ```
 
-### Phase 1: トークン発行 + 物理配送
+### Phase 1: JIT トークン発行
+
+投票者が投票所に来所した時点でオンデマンド発行。事前の全量発行は不要。
 
 ```
-Mint TX (選挙管理委員会がマルチシグで実行):
-  Input:  Election Master UTXO
+Mint TX (選管デュアルシグ):
+  Input:  Election Master UTXO (または continuation)
   Outputs:
-    [0]: 投票者 A のトークン UTXO
+    [0]: 投票者トークン UTXO (value = TOKEN_VAL)
          covenant_id: 選挙 ID (continuation)
-         script_public_key: <voter_A_pubkey> OpCheckSig + 匿名化ルール
-    [1]: 投票者 B のトークン UTXO
-    ...
-    [N]: 次の Mint 用 Master UTXO (continuation)
-         ※ 最終 Mint TX では continuation なし → Master UTXO 消滅
+         script_public_key: KASTAnon(voter_pubkey, station_pubkey)
+    [1]: Continuation Master UTXO (同一スクリプト)
+         ※ 最終 Mint TX: continuation なし → Master UTXO 消滅 (seal)
 
-物理配送:
-  各投票者の秘密鍵を QR コード化
-  → 封筒に封入して郵送（QR1）
+  Covenant ルール (KASTMint コントラクト):
+    checkSig × 2          → 選管2名のデュアルシグ
+    OpCovOutCount          → 全出力が同一 covenant chain
+    output.value           → 均一な TOKEN_VAL
+    output.lockingBytecode → continuation が master スクリプトを保持
+
+  柔軟バッチ: 1TX あたり 1〜4 トークン (繁忙時は小プール事前生成も可)
 ```
 
-### Phase 2: 匿名化（投票所での本人確認）
+### Phase 2: 匿名化（QR1 → QR2）
+
+投票所での物理的な匿名化により、投票者の身元と投票内容のリンクを断つ。
 
 ```
 [物理プロセス]
-  投票者が封筒の QR1 を投票所に持参
-  → 本人確認（ID チェック）
-  → 投票所端末が匿名化 TX を構築・送信
-  → 新しい QR2（匿名投票トークン）を印刷
+  ① 投票者が QR1 (身元ウォレット) を提示
+  ② 投票所で本人確認 (ID チェック)
+  ③ 投票者 + 投票所端末で匿名化 TX に共同署名 (2-of-2)
+  ④ 端末が新しい鍵ペアを生成 → QR2 (匿名投票用紙) を印刷
+  ⑤ QR1 は回収・無効化
 
 [オンチェーンプロセス]
   Anonymize TX:
-    Input: 投票者 A の identifiable トークン UTXO
+    Input: 投票者の identifiable トークン UTXO
 
     signature_script:
-      ├── 投票者 A の秘密鍵による署名
-      ├── ZK Proof (RISC0 or Groth16):
-      │     証明内容:
-      │       「私の公開鍵は選挙 Merkle tree に含まれる」
-      │       「この nullifier は私の鍵から一意に導出された」
-      │     非公開:
-      │       どのリーフ（どの投票者）かは隠される
-      └── tag: 0x21 (RISC0 Succinct) or 0x20 (Groth16)
+      ├── 投票者の署名 (QR1 の秘密鍵)
+      └── 投票所端末の署名 (共同署名)
+      [将来: + OpZkPrecompile による ZK Proof でオンチェーン匿名化]
 
     Output: 匿名トークン UTXO
       covenant_id: 同じ選挙 ID (continuation)
-      script_public_key: <new_random_pubkey> + 投票先制約ルール
-      value: 1 sompi
+      script_public_key: KASTVote(candidateA, ..., candidateJ)
+      value: TOKEN_VAL
 
-  ※ この時点で QR1 の UTXO は消滅 → QR1 は無効化
-  ※ Input（投票者 A）と Output（匿名トークン）のリンクは ZK で切断
+  Covenant ルール (KASTAnon コントラクト):
+    checkSig × 2           → 2-of-2: 投票者鍵 + 端末鍵
+    OpCovOutCount == 1     → 匿名出力は1つだけ
+    output.value           → 価値保全
+
+  ※ QR1 の UTXO は消滅 → QR1 は無効化
+  ※ 物理的な QR 交換が脅迫/買収耐性を提供
+  ※ オンチェーンのリンク (投票者→匿名トークン) は PoC では可視;
+     OpZkPrecompile 対応時に暗号的に切断
 ```
 
-### Phase 3: 投票
+### Phase 3: 投票（即時）
+
+QR2 受取後すぐに投票。QR2 は投票用紙と同様に物理回収される。
 
 ```
 [物理プロセス]
-  投票者が QR2 を備え付け PC にスキャン
-  → タッチ操作で候補者を選択
-  → 端末が Vote TX を送信
-  → QR2 は使用済み（UTXO 消滅）
+  ① 投票者が端末で QR2 をスキャン
+  ② 画面で候補者を選択
+  ③ 端末が Vote TX を構築・送信
+  ④ QR2 を物理回収 (投票箱モデル)
+  ⑤ 投票者にステッカー / 参加証明を配布
 
 [オンチェーンプロセス]
   Vote TX:
     Input: 匿名トークン UTXO
 
     signature_script:
-      └── 匿名鍵での署名
+      └── 匿名鍵での署名 (QR2)
 
-    Output: 候補者 C の集票アドレス
+    Output: 候補者の集票アドレス
       covenant_id: 同じ選挙 ID (continuation)
-      script_public_key: candidate_C_collection_script
-      value: 1 sompi
+      script_public_key: 候補者集票スクリプト (P2PK)
+      value: TOKEN_VAL
 
-  Covenant スクリプトが強制するルール:
+  Covenant ルール (KASTVote コントラクト):
+    checkSig               → 匿名鍵の署名検証
+    OpCovOutCount == 1     → 出力は1つだけ
+    OpTxOutputSpk          → 出力先が候補者ホワイトリスト内 (最大10人)
+    output.value           → 価値保全
     OpInputCovenantId      → covenant chain の検証
-    OpCovOutCount          → 出力が 1 つだけであること
-    OpTxOutputSpk          → 出力先が候補者リストに含まれること
-    OpTxOutputAmount       → value が保存されること
 ```
 
-### Phase 4: 集計
+### Phase 4: 集計 + リアルタイム集約
+
+選挙中、選管が定期的に Vote UTXO を集約し、ロック資本を解放する。選挙後にタイムロック解除で KAS を回収。
 
 ```
-候補者 A の集票アドレスの UTXO 数 = 候補者 A の得票数
-候補者 B の集票アドレスの UTXO 数 = 候補者 B の得票数
-...
+[選挙中 — リアルタイム集約]
+  Aggregate TX (選管の署名):
+    Inputs: 同一候補者アドレスの複数 Vote UTXO (最大8入力)
+    Output: 1つの集約 UTXO (value = 全入力の合計)
 
-→ オンチェーンで誰でも検証可能
-→ 中央サーバーや管理者の介入なし
+  Covenant ルール (KASTTally.aggregate):
+    checkSig                    → 選管のみ実行可能
+    OpCovInputCount             → 同一 covenant の入力数を取得
+    OpCovInputIdx + input.value → 全入力の value を合算
+    output.value >= total       → 価値保全
+    output.lockingBytecode      → 自己参照 (同一 tally スクリプト)
+    OpCovOutCount == 1          → 単一の集約出力
+
+  例: 8 Vote UTXO (0.8 KAS) → 1 UTXO (0.8 KAS)
+
+[選挙後 — 集計 & 解除]
+  得票数 = 候補者アドレスの total_value / TOKEN_VAL
+  → オンチェーンで誰でも検証可能、中央サーバー不要
+
+  Release TX (選管の署名 + タイムロック):
+    require(tx.time >= electionEnd)
+    → 選挙終了後、選管が預託 KAS を回収
 ```
 
 ### Phase 5: 検証
 
 ```
 投票参加の証明:
-  投票者 A の元トークン UTXO → spent（オンチェーンで確認可能）
-  → 「投票者 A は投票に参加した」 ✓
+  投票者の QR1 トークン UTXO → spent (オンチェーンで確認可能)
+  → 「この投票者は選挙に参加した」 ✓
+  [義務投票国: KASTReceipt UTXO でオンチェーン証明]
 
 投票内容の秘匿:
-  投票者 A の匿名トークン → 候補者 ? のアドレス
-  → Phase 2 でリンクが切断されているため追跡不可能 ✓
+  投票者の匿名トークン → 候補者 ? のアドレス
+  → 物理的な QR 交換でリンクが切断 ✓
+  → 将来の ZK proof で暗号的にも完全に追跡不能に
 ```
 
 ---
 
 ## QR トークンのライフサイクル
 
-### QR1（封筒で郵送）
+### QR1（身元ウォレット — 事前配布）
 
 ```
-生成 → 封筒で郵送 → 投票所で使用（匿名化 TX）→ UTXO 消滅 → 終わり
+生成 → 投票者に配布 (空ウォレット、鍵ペアのみ)
+→ 投票者が投票所に持参
+→ トークンが JIT Mint で QR1 ウォレットに送金 (Phase 1)
+→ 匿名化に使用 (Phase 2, 2-of-2 共同署名) → UTXO 消滅
+→ QR1 は投票所で回収 → 終わり
 
-×再利用: UTXO が存在しない（コンセンサスが拒否）
-×再発行: Master UTXO が burn 済み（mint 権限が消滅）
-×コピー: 先に使われたら UTXO 消滅、後から使えない
-         + 投票所での本人確認 (2-of-2 マルチシグ) が必要
+× 再利用: UTXO が存在しない (コンセンサスが拒否)
+× 再発行: Master UTXO が burn 済み (mint 権限が消滅)
+× 盗難: 単独では無効 — 投票所端末の共同署名 (2-of-2) が必要
+× 撮影: オンチェーンでは投票参加の事実のみ判明、投票先は不明 (ZK追加後)
 ```
 
-### QR2（投票所で印刷）
+### QR2（匿名投票用紙 — 投票所で生成）
 
 ```
-投票所端末で生成 → その場で投票に使用 → UTXO 消滅 → 終わり
+端末で生成 (新しい鍵ペア) → 投票者に手渡し
+→ 即座に投票に使用 (Phase 3) → UTXO 消滅
+→ QR2 は物理回収 (投票用紙と同じ) → 終わり
 
-×再利用: UTXO が存在しない
-×再発行: QR1 が消滅済みなので匿名化 TX を再実行できない
-×コピー: 端末内で生成・即使用なので物理的にコピー困難
+× 再利用: UTXO が存在しない
+× 再発行: QR1 が消滅済みなので匿名化 TX を再実行できない
+× 脅迫: 投票者は投票先を証明できない (QR2回収済み、リンク切断)
+× 回収後の追跡: ZK があれば回収された QR2 から投票者を逆引き不能
 ```
 
 ---
@@ -500,15 +490,69 @@ KAST では 1 投票者あたり 2 TX（匿名化 + 投票）を必要とする�
 
 ---
 
+## 実装状況
+
+コントラクトは [SilverScript](https://github.com/aspect-build/silverscript) で記述し、`silverc` でコンパイル済み。ソースとバイトコードは本リポジトリに格納。
+
+### コンパイル済みコントラクト
+
+| Contract | ファイル | Bytecode | ABI | 役割 |
+|---|---|---|---|---|
+| KASTMintV2 | `kast_mint_v2.sil` | 329 B | `mint(sig,sig)` / `seal(sig,sig)` | JIT トークン発行 |
+| KASTAnonV2 | `kast_anon_v2.sil` | 96 B | `anonymize(sig,sig)` | 2-of-2 匿名化 |
+| KASTVoteV2 | `kast_vote_v2.sil` | 488 B | `vote(sig,pubkey)` | 10候補者投票 |
+| KASTTallyV2 | `kast_tally_v2.sil` | 4,010 B | `aggregate(sig)` / `release(sig)` | リアルタイム集約 |
+| KASTReceipt | `kast_receipt.sil` | 95 B | `claim(sig)` / `void(sig)` | 義務投票証明 |
+
+### コスト試算 (5,000万人規模, TOKEN_VAL = 0.1 KAS, 低混雑)
+
+| | 必要資金 | 性質 |
+|---|---|---|
+| ピーク預託 | ~37,000 KAS | 選挙後に全額回収 |
+| トランザクション手数料 | ~44,000 KAS | 消費 (マイナーへ) |
+| **合計** | **~81,000 KAS** | |
+
+手数料内訳: Mint 30K (69%, storage mass が支配的) + Anon 10K + Vote 3K + Aggregate 0.5K
+
+### パラメータ
+
+| パラメータ | 値 | 根拠 |
+|---|---|---|
+| TOKEN_VAL | 0.1 KAS (10M sompi) | storage mass と預託のバランス |
+| MAX_BATCH (Mint) | 4 | 投票所の混雑度に応じて調整 |
+| MAX_AGGREGATE (Tally) | 8 | スクリプトサイズ上限 (10KB) |
+| 候補者スロット | 10 | 主要な選挙形態をカバー |
+
+詳細設計は [PLAN_V2.md](PLAN_V2.md) を参照。
+
+---
+
+## 国際対応
+
+| 要件 | 対象国 | KAST のアプローチ |
+|---|---|---|
+| 秘密投票 | 全民主国家 | QR1/QR2 物理交換 + 将来 ZK |
+| 義務投票証明 | 27カ国 (ボリビア、豪州等) | KASTReceipt オンチェーン UTXO |
+| 二重投票防止 | インク方式 90カ国以上 | Covenant: 1 UTXO = 1票 (インク不要) |
+| 郵便投票 | 多数国 | 将来: オンライン Phase 2 (ZK必須) |
+| タイミング分析防止 | 全般 | Phase 2 TX を投票所でバッチ送信 |
+| 投票者紐づけ許可 | 米国一部州 (IN, NC) | ZK をオプション化で対応可能 |
+
+---
+
 ## 制約と今後の展望
 
-### Covenant++ 段階での制約
+### 現在の PoC 制約
 
-| 制約 | 説明 |
-|---|---|
-| 投票内容の暗号化集計 | 候補者アドレスへの送信方式では、匿名トークンの送り先自体は公開。リンクが切れているので実用上問題ないが、完全な暗号化集計には vProgs が必要 |
-| スクリプトサイズ制限 | 複雑な投票ルール（委任投票、順位投票等）は L1 スクリプトの制約に収まらない可能性がある |
-| インデクサーの必要性 | covenant_id ベースの集計クエリを効率的に行うには、専用のインデクサーが必要 |
+| 制約 | 説明 | 解消 |
+|---|---|---|
+| OpZkPrecompile (0xa6) | 暗号的匿名化が未実装。物理 QR 交換のみ | SilverScript 対応待ち |
+| OpTxInputDaaScore | 厳密な時間窓制御が不可 | `this.age` で代替中 |
+| checkMultiSig | 2つの `checkSig` で代替 | SilverScript 対応待ち |
+| MAX_AGGREGATE = 8 | 集約は8入力/TX。多段集約で対応 | スクリプトサイズ上限 |
+| 暗号化集計 | 候補者アドレスへの送信先は公開 | vProgs (CairoVM) で対応 |
+| スクリプトサイズ制限 | 複雑な投票ルール (委任投票、順位投票等) は収まらない可能性 | vProgs で対応 |
+| インデクサーの必要性 | covenant_id ベースの集計に専用インデクサーが必要 | 標準インフラ |
 
 ### vProgs 時代の拡張（将来）
 

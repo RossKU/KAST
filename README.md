@@ -8,77 +8,6 @@
 
 ---
 
-## v2 Implementation Status (Current)
-
-KAST v2 contracts have been compiled and verified with [SilverScript](https://github.com/aspect-build/silverscript). The full ZK anonymization layer (OpZkPrecompile) is not yet available in SilverScript — the current PoC uses physical QR1/QR2 anonymization at polling stations.
-
-### v2 Protocol Flow
-
-```
-[Pre]     QR1 = Empty wallet distributed (keypair only, no KAS needed)
-[Arrive]  Commission JIT-mints token → voter's QR1 wallet          ← Phase 1
-[Arrive]  Voter + Station 2-of-2 burn → anonymous QR2 issued       ← Phase 2
-[Instant] QR2 used to vote → candidate collection address           ← Phase 3
-          QR2 physically collected (like a paper ballot)
-          Sticker issued (proof of participation, not vote choice)
-[Ongoing] Commission aggregates vote UTXOs in real-time             ← Phase 4a
-[Post]    Timelock expires → KAS recovered                          ← Phase 4b
-```
-
-### v2 Key Innovations
-
-| Innovation | Impact |
-|---|---|
-| **JIT Mint** | Tokens minted on-demand at polling stations. Zero pre-mint inventory |
-| **Real-time Aggregation** | Vote UTXOs merged during election via `OpCovInputCount` + `OpCovInputIdx`. Deposit reduced from 13.75M to ~37K KAS for 50M voters |
-| **Immediate Flow** | Mint → Anon → Vote completes in ~3 minutes at the station |
-| **10 Candidates** | Whitelist expanded from 3 to 10 via `LockingBytecodeP2PK` |
-| **Voting Receipt** | On-chain participation proof for compulsory voting countries |
-
-### Compiled Contracts
-
-| Contract | File | Bytecode | ABI |
-|---|---|---|---|
-| KASTMintV2 | `kast_mint_v2.sil` | 329 bytes | `mint(sig,sig)` / `seal(sig,sig)` |
-| KASTAnonV2 | `kast_anon_v2.sil` | 96 bytes | `anonymize(sig,sig)` |
-| KASTVoteV2 | `kast_vote_v2.sil` | 488 bytes | `vote(sig,pubkey)` |
-| KASTTallyV2 | `kast_tally_v2.sil` | 4,010 bytes | `aggregate(sig)` / `release(sig)` |
-| KASTReceipt | `kast_receipt.sil` | 95 bytes | `claim(sig)` / `void(sig)` |
-
-### Cost Estimate (50M voters, TOKEN_VAL = 0.1 KAS)
-
-| | v1 (pre-mint) | v2 (JIT + aggregate) |
-|---|---|---|
-| Pre-mint inventory | 5M KAS | **0 KAS** |
-| Peak deposit (locked) | 13.75M KAS | **~37,000 KAS** |
-| Fees (consumed) | ~28,000 KAS | ~44,000 KAS |
-| **Total required** | **~25M KAS** | **~81,000 KAS** |
-
-Deposit reduction: **99.7%**. Fees increase by ~16K KAS due to storage mass on small UTXOs, but the capital efficiency improvement is overwhelming.
-
-### International Compatibility
-
-| Requirement | Countries | Status |
-|---|---|---|
-| Secret ballot | All democracies | Physical QR1→QR2 + future ZK |
-| Compulsory voting proof | 27 countries (Bolivia, Australia, etc.) | KASTReceipt (on-chain) |
-| Double-vote prevention | 90+ ink-based countries | Covenant 1 UTXO = 1 vote |
-| Mail-in voting | Many countries | Future: online Phase 2 (requires ZK) |
-| Timing analysis prevention | General | Phase 2 TX batch broadcast |
-
-### Current Limitations (PoC)
-
-| Limitation | Impact | Resolution |
-|---|---|---|
-| OpZkPrecompile (0xa6) | No cryptographic anonymization | Await SilverScript support |
-| OpTxInputDaaScore | No precise time windows | Uses `this.age` as fallback |
-| checkMultiSig | Dual checkSig workaround | Await SilverScript support |
-| MAX_AGGREGATE = 8 | Multi-pass aggregation needed | Script size limit (10KB) |
-
-See [PLAN_V2.md](PLAN_V2.md) for full v2 design documentation.
-
----
-
 ## Motivation
 
 The goal of KAST is not to reinvent elections — it is to make the existing system tamper-proof by anchoring it to a blockchain.
@@ -134,7 +63,7 @@ Transaction structure (unchanged):
     signature_script     ← signature + ZK proof data (binary push)
 
   TransactionOutput:
-    value                ← minimum (1 sompi)
+    value                ← TOKEN_VAL (0.1 KAS)
     script_public_key    ← covenant rules (voting constraint script)
     covenant             ← Option<CovenantBinding>
       authorizing_input  ← index of the authorizing input
@@ -145,144 +74,205 @@ Transaction structure (unchanged):
 
 ## Protocol Flow
 
+```
+[Pre-election]
+  QR1 distributed to each voter (empty wallet = keypair only, no KAS)
+  Election Genesis TX creates Master UTXO with unique covenant_id
+
+[Election day — at polling station, ~3 minutes per voter]
+  Phase 1: Commission JIT-mints token → voter's wallet         (KASTMint)
+  Phase 2: Voter + Station 2-of-2 burn → anonymous QR2 issued  (KASTAnon)
+  Phase 3: QR2 used to vote → candidate collection address      (KASTVote)
+           QR2 physically collected (like a paper ballot)
+           Sticker / receipt issued
+
+[During election — background]
+  Phase 4a: Commission aggregates vote UTXOs in real-time       (KASTTally.aggregate)
+
+[Post-election]
+  Phase 4b: Timelock expires → KAS recovered                    (KASTTally.release)
+  Tally:    total_value / TOKEN_VAL per candidate = vote count
+```
+
 ### Phase 0: Election Setup
 
 ```
 Election Commission:
-  1. Build Merkle tree from voter registry
-     Leaf = each voter's public key
-  2. Issue Election Genesis TX
+  1. Generate Election Genesis TX
      Output: Election Master UTXO
        covenant_id: Hash(outpoint + outputs) ← unique election ID
-       script_public_key: [Merkle root, candidate list, election rules]
-  3. Commit Merkle root and tree size on-chain (public information)
+  2. Generate QR1 for each registered voter
+     QR1 = keypair only (empty wallet, no KAS pre-loaded)
+     Private key encoded as QR code, distributed to voter
+  3. Build Merkle tree from voter registry (for future ZK verification)
+     Commit Merkle root on-chain (public information)
 ```
 
-### Phase 1: Token Minting + Physical Delivery
+### Phase 1: JIT Token Minting
+
+Tokens are minted on-demand as voters arrive at polling stations — no pre-minting required.
 
 ```
-Mint TX (executed by commission via multisig):
-  Input:  Election Master UTXO
+Mint TX (commission dual-sig):
+  Input:  Election Master UTXO (or continuation)
   Outputs:
-    [0]: Voter A's token UTXO
+    [0]: Voter token UTXO (value = TOKEN_VAL)
          covenant_id: election ID (continuation)
-         script_public_key: <voter_A_pubkey> OpCheckSig + anonymization rules
-    [1]: Voter B's token UTXO
-    ...
-    [N]: Next Mint Master UTXO (continuation)
-         * Final Mint TX has no continuation → Master UTXO destroyed
+         script_public_key: KASTAnon(voter_pubkey, station_pubkey)
+    [1]: Continuation Master UTXO (same script)
+         * Final Mint TX: no continuation → Master UTXO destroyed (seal)
 
-Physical delivery:
-  Each voter's private key encoded as QR code
-  → Sealed in envelope and mailed (QR1)
+  Covenant rules enforced (KASTMint contract):
+    checkSig × 2          → dual-sig from commissioners
+    OpCovOutCount          → all outputs in same covenant chain
+    output.value           → uniform TOKEN_VAL per token
+    output.lockingBytecode → continuation preserves master script
+
+  Flexible batch: 1 to 4 tokens per TX (busy stations can pre-mint small pools)
 ```
 
-### Phase 2: Anonymization (Identity Verification at Polling Station)
+### Phase 2: Anonymization (QR1 → QR2)
+
+Physical anonymization at the polling station severs the link between voter identity and ballot.
 
 ```
 [Physical process]
-  Voter brings QR1 envelope to polling station
-  → Identity verification (ID check)
-  → Station terminal constructs and broadcasts Anonymize TX
-  → Prints new QR2 (anonymous vote token)
+  1. Voter presents QR1 (identity wallet)
+  2. Station verifies identity (ID check)
+  3. Voter + Station co-sign Anonymize TX (2-of-2)
+  4. Station generates fresh keypair → prints QR2 (anonymous ballot)
+  5. QR1 is collected / invalidated
 
 [On-chain process]
   Anonymize TX:
-    Input: Voter A's identifiable token UTXO
+    Input: Voter's identifiable token UTXO
 
     signature_script:
-      ├── Voter A's signature (signed with private key)
-      ├── ZK Proof (RISC0 or Groth16):
-      │     Proves:
-      │       "My public key is included in the election Merkle tree"
-      │       "This nullifier is uniquely derived from my key"
-      │     Hidden:
-      │       Which leaf (which voter) is not revealed
-      └── tag: 0x21 (RISC0 Succinct) or 0x20 (Groth16)
+      ├── Voter's signature (QR1 private key)
+      └── Station terminal's signature (co-sign)
+      [Future: + ZK Proof via OpZkPrecompile for on-chain anonymization]
 
     Output: Anonymous token UTXO
       covenant_id: same election ID (continuation)
-      script_public_key: <new_random_pubkey> + vote destination rules
-      value: 1 sompi
+      script_public_key: KASTVote(candidateA, ..., candidateJ)
+      value: TOKEN_VAL
 
-  * At this point QR1's UTXO is destroyed → QR1 is invalidated
-  * The link between Input (Voter A) and Output (anonymous token) is severed by ZK
+  Covenant rules enforced (KASTAnon contract):
+    checkSig × 2           → 2-of-2: voter key + station key
+    OpCovOutCount == 1     → exactly 1 anonymous output
+    output.value           → value preservation
+
+  * QR1's UTXO is destroyed → QR1 becomes invalid
+  * Physical QR exchange provides coercion/bribery resistance
+  * On-chain link (voter → anonymous token) is visible in PoC;
+    will be cryptographically severed when OpZkPrecompile is available
 ```
 
-### Phase 3: Voting
+### Phase 3: Voting (Immediate)
+
+Voter uses QR2 immediately after receiving it. QR2 is physically collected after use, like a paper ballot.
 
 ```
 [Physical process]
-  Voter scans QR2 at station PC
-  → Selects candidate via touch interface
-  → Terminal sends Vote TX
-  → QR2 is consumed (UTXO destroyed)
+  1. Voter scans QR2 at terminal
+  2. Selects candidate on screen
+  3. Terminal constructs and sends Vote TX
+  4. QR2 is physically collected (ballot-box model)
+  5. Voter receives sticker / participation receipt
 
 [On-chain process]
   Vote TX:
     Input: Anonymous token UTXO
 
     signature_script:
-      └── Signature with anonymous key
+      └── Signature with anonymous key (QR2)
 
-    Output: Candidate C's collection address
+    Output: Candidate's collection address
       covenant_id: same election ID (continuation)
-      script_public_key: candidate_C_collection_script
-      value: 1 sompi
+      script_public_key: candidate collection script (P2PK)
+      value: TOKEN_VAL
 
-  Rules enforced by covenant script:
-    OpInputCovenantId      → verify covenant chain
-    OpCovOutCount          → exactly 1 output
-    OpTxOutputSpk          → output destination is in candidate list
-    OpTxOutputAmount       → value is preserved
+  Covenant rules enforced (KASTVote contract):
+    checkSig               → anonymous key signature
+    OpCovOutCount == 1     → exactly 1 vote output
+    OpTxOutputSpk          → destination is in candidate whitelist (up to 10)
+    output.value           → value preservation
+    OpInputCovenantId      → covenant chain verification
 ```
 
-### Phase 4: Tallying
+### Phase 4: Tallying + Real-time Aggregation
+
+During the election, the commission periodically consolidates vote UTXOs to free up locked capital. After the election, KAS is recovered via timelock release.
 
 ```
-UTXO count at Candidate A's collection address = Candidate A's votes
-UTXO count at Candidate B's collection address = Candidate B's votes
-...
+[During election — Real-time Aggregation]
+  Aggregate TX (commission signature):
+    Inputs: Multiple vote UTXOs at same candidate address (up to 8)
+    Output: 1 consolidated UTXO (value = sum of inputs)
 
-→ Verifiable on-chain by anyone
-→ No central server or administrator involvement
+  Covenant rules enforced (KASTTally.aggregate):
+    checkSig                    → election authority only
+    OpCovInputCount             → count same-covenant inputs
+    OpCovInputIdx + input.value → sum all input values
+    output.value >= total       → value preservation
+    output.lockingBytecode      → self-referencing (same tally script)
+    OpCovOutCount == 1          → single consolidated output
+
+  Example: 8 vote UTXOs (0.8 KAS) → 1 UTXO (0.8 KAS)
+
+[Post-election — Tally & Release]
+  Vote count = total_value_at_candidate_address / TOKEN_VAL
+  → Verifiable on-chain by anyone, no central server
+
+  Release TX (commission signature + timelock):
+    require(tx.time >= electionEnd)
+    → Commission recovers deposited KAS after election concludes
 ```
 
 ### Phase 5: Verification
 
 ```
 Proof of participation:
-  Voter A's original token UTXO → spent (verifiable on-chain)
-  → "Voter A participated in the election" ✓
+  Voter's QR1 token UTXO → spent (verifiable on-chain)
+  → "This voter participated in the election" ✓
+  [Compulsory voting countries: KASTReceipt UTXO as on-chain proof]
 
 Vote content secrecy:
-  Voter A's anonymous token → Candidate ?'s address
-  → Link severed in Phase 2, untraceable ✓
+  Voter's anonymous token → Candidate ?'s address
+  → Physical QR exchange severs the link ✓
+  → Future ZK proof will make this cryptographically unbreakable
 ```
 
 ---
 
 ## QR Token Lifecycle
 
-### QR1 (Mailed in Envelope)
+### QR1 (Identity Wallet — distributed pre-election)
 
 ```
-Generated → mailed in envelope → used at polling station (Anonymize TX) → UTXO destroyed → done
+Generated → distributed to voter (empty wallet, keypair only)
+→ Voter brings to polling station
+→ Token JIT-minted to QR1 wallet (Phase 1)
+→ Used for anonymization (Phase 2, 2-of-2 co-sign) → UTXO destroyed
+→ QR1 collected at station → done
 
 × Reuse: UTXO no longer exists (consensus rejects)
 × Reissue: Master UTXO already burned (mint authority destroyed)
-× Copy: if used first, UTXO is gone; cannot be used again
-         + identity verification at polling station (2-of-2 multisig) required
+× Stolen: useless alone — requires station terminal co-sign (2-of-2)
+× Photographed: on-chain shows participation only, not vote choice (with ZK)
 ```
 
-### QR2 (Printed at Polling Station)
+### QR2 (Anonymous Ballot — generated at polling station)
 
 ```
-Generated at terminal → used immediately for voting → UTXO destroyed → done
+Generated at terminal (fresh keypair) → handed to voter
+→ Used immediately for voting (Phase 3) → UTXO destroyed
+→ QR2 physically collected (like a paper ballot) → done
 
 × Reuse: UTXO no longer exists
 × Reissue: QR1 already destroyed, cannot re-execute Anonymize TX
-× Copy: generated and used within terminal, physically difficult to copy
+× Coercion: voter cannot prove vote choice (QR2 collected, link severed)
+× Recovered: with ZK, cannot trace back to voter even if QR2 is found
 ```
 
 ---
@@ -498,15 +488,69 @@ Censorship resistance is the highest-priority requirement for election systems, 
 
 ---
 
+## Implementation Status
+
+Contracts are written in [SilverScript](https://github.com/aspect-build/silverscript) and compiled with `silverc`. Full source and bytecodes are in this repository.
+
+### Compiled Contracts
+
+| Contract | File | Bytecode | ABI | Role |
+|---|---|---|---|---|
+| KASTMintV2 | `kast_mint_v2.sil` | 329 B | `mint(sig,sig)` / `seal(sig,sig)` | JIT token issuance |
+| KASTAnonV2 | `kast_anon_v2.sil` | 96 B | `anonymize(sig,sig)` | 2-of-2 anonymization |
+| KASTVoteV2 | `kast_vote_v2.sil` | 488 B | `vote(sig,pubkey)` | 10-candidate voting |
+| KASTTallyV2 | `kast_tally_v2.sil` | 4,010 B | `aggregate(sig)` / `release(sig)` | Real-time aggregation |
+| KASTReceipt | `kast_receipt.sil` | 95 B | `claim(sig)` / `void(sig)` | Compulsory voting proof |
+
+### Cost Estimate (50M voters, TOKEN_VAL = 0.1 KAS, low congestion)
+
+| | Required capital | Nature |
+|---|---|---|
+| Peak deposit | ~37,000 KAS | Recovered after election |
+| Transaction fees | ~44,000 KAS | Consumed (paid to miners) |
+| **Total** | **~81,000 KAS** | |
+
+Fee breakdown: Mint 30K (69%, dominated by storage mass) + Anon 10K + Vote 3K + Aggregate 0.5K.
+
+### Parameters
+
+| Parameter | Value | Rationale |
+|---|---|---|
+| TOKEN_VAL | 0.1 KAS (10M sompi) | Balance between storage mass fees and deposit |
+| MAX_BATCH (Mint) | 4 | Adjustable per station congestion |
+| MAX_AGGREGATE (Tally) | 8 | Script size limit (10KB max) |
+| Candidate slots | 10 | Covers most election types |
+
+See [PLAN_V2.md](PLAN_V2.md) for detailed design documentation.
+
+---
+
+## International Compatibility
+
+| Requirement | Affected Countries | KAST Approach |
+|---|---|---|
+| Secret ballot | All democracies | Physical QR1/QR2 exchange + future ZK |
+| Compulsory voting proof | 27 countries (Bolivia, Australia, etc.) | KASTReceipt on-chain UTXO |
+| Double-vote prevention | 90+ ink-based countries | Covenant: 1 UTXO = 1 vote (replaces ink) |
+| Mail-in voting | Many countries | Future: online Phase 2 requiring ZK |
+| Timing analysis prevention | General | Phase 2 TX batch broadcast at stations |
+| Voter-ballot linking permitted | US states (IN, NC) | ZK can be made optional |
+
+---
+
 ## Limitations and Future Outlook
 
-### Limitations at the Covenant++ Stage
+### Current PoC Limitations
 
-| Limitation | Description |
-|---|---|
-| Encrypted tallying | With the "send to candidate address" model, the anonymous token's destination is public. Not a practical issue since the link is severed, but fully encrypted tallying requires vProgs |
-| Script size limits | Complex voting rules (delegated voting, ranked-choice, etc.) may not fit within L1 script constraints |
-| Indexer dependency | Efficient covenant_id-based tally queries require a dedicated indexer |
+| Limitation | Description | Resolution |
+|---|---|---|
+| OpZkPrecompile (0xa6) | No cryptographic anonymization yet. Physical QR exchange only | Await SilverScript support |
+| OpTxInputDaaScore | No precise time window enforcement | `this.age` as fallback |
+| checkMultiSig | Implemented as dual `checkSig` | Await SilverScript support |
+| MAX_AGGREGATE = 8 | Tally aggregation limited to 8 inputs per TX | Script size limit (10KB); multi-pass |
+| Encrypted tallying | Candidate destination is public on-chain | Requires vProgs (CairoVM) |
+| Script size limits | Complex voting rules may not fit in L1 script | vProgs for advanced logic |
+| Indexer dependency | Efficient covenant_id queries need dedicated indexer | Standard infra |
 
 ### Future Extensions with vProgs
 
