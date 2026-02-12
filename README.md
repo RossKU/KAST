@@ -281,10 +281,10 @@ Generated at terminal (fresh keypair) → handed to voter
 
 ### 1. Timing Analysis Attack
 
-**Threat**: Temporal proximity between Anonymize TX and Vote TX could allow linking voter to vote content.
+**Threat**: In the JIT flow, Mint → Anon → Vote happens within ~3 minutes at the station. An observer could correlate a voter's arrival time with on-chain TX timestamps to link voter identity to vote content.
 
 ```
-Example: Voter A anonymizes at 14:32:01, votes for Candidate X at 14:32:03
+Example: Voter A arrives at 14:30, on-chain shows Mint at 14:31, Anon at 14:32, Vote for X at 14:33
          → Time correlation suggests A → X
 ```
 
@@ -292,96 +292,120 @@ Example: Voter A anonymizes at 14:32:01, votes for Candidate X at 14:32:03
 
 | Countermeasure | Implementation |
 |---|---|
-| Time-window batching | Covenant script uses OpTxInputDaaScore to separate anonymization and voting periods. Window 1 (morning): anonymization only. Window 2 (afternoon): voting only |
-| High BPS utilization | Kaspa at 100 BPS produces 100 blocks per second. Many TXs land in the same block, making individual linking difficult |
-| Terminal batch broadcast | Polling station terminals queue Anonymize TXs and broadcast in batches, concealing individual timing |
+| Terminal batch broadcast | Station terminals queue all TXs (Mint, Anon, Vote) and broadcast in randomized batches every N minutes. Individual timing is concealed within the batch |
+| Physical booth separation | Phase 2 (anonymization) and Phase 3 (voting) occur in physically separate booths. Observer cannot correlate which voter enters which booth |
+| High BPS utilization | Kaspa at 100 BPS: many TXs land in the same block. With batching, dozens of voters' TXs are interleaved |
+| Future: DaaScore windows | When OpTxInputDaaScore is available, covenant-enforced time separation between phases can be added |
 
 ### 2. Election Commission Fraud (Token Inflation)
 
-**Threat**: Commission mints more tokens than eligible voters and casts fraudulent votes.
+**Threat**: Commission JIT-mints more tokens than voters who actually arrive, casting fraudulent votes.
 
 **Countermeasures**:
 
 | Countermeasure | Implementation |
 |---|---|
-| Mint authority sealing | Final Mint TX burns Master UTXO (no continuation output). Minting becomes impossible thereafter |
-| Public issuance audit | Merkle tree leaf count = voter count (public). All Mint TXs are visible on-chain. Token count can be cross-referenced with voter rolls |
-| Multisig requirement | Master UTXO's script_public_key requires OpCheckMultiSig. N-of-M signatures needed to mint (prevents single-actor fraud) |
-| Covenant constraint | Output count ≤ Merkle tree size + 1 (continuation) enforced by script |
+| Mint authority sealing | `seal()` entrypoint burns Master UTXO permanently. Minting becomes impossible after seal |
+| JIT audit trail | Every Mint TX is on-chain with timestamp. Total minted tokens can be cross-referenced with polling station visitor logs in real-time |
+| Dual-sig requirement | KASTMint requires both commissioners' signatures. Single-actor fraud is impossible |
+| Public issuance count | Merkle tree leaf count = registered voter count (public). Minted tokens exceeding this count are immediately detectable |
+| Covenant constraint | KASTMint enforces uniform TOKEN_VAL per output and covenant chain continuity |
 
 ### 3. QR1 Theft or Loss
 
-**Threat**: If the envelope is stolen, the attacker could use the vote token first.
+**Threat**: QR1 is mailed in a sealed envelope. If intercepted, the attacker could impersonate the voter.
 
 **Countermeasures**:
 
 | Countermeasure | Implementation |
 |---|---|
-| 2-of-2 multisig | QR1's UTXO = voter's key + station terminal's key. Both required to execute Anonymize TX. Stealing the envelope alone is insufficient |
-| In-person ID verification | Physical ID check (driver's license, national ID, etc.) is a prerequisite for terminal co-signing |
-| Loss handling | Non-reissuable (Master is burned). Treated as loss of voting right (equivalent to losing a paper ballot) |
+| 2-of-2 multisig | KASTAnon requires voter's signature (QR1) + station terminal's signature. Stolen QR1 alone cannot execute Anonymize TX |
+| In-person ID verification | Physical ID check (driver's license, national ID, etc.) is a prerequisite for the station terminal to co-sign |
+| JIT protection | In v2, QR1 is an empty wallet — no token exists until the voter arrives. Stealing QR1 before arrival gains nothing; the attacker must also pass ID verification at the station |
+| Loss handling | Non-reissuable (Master can be sealed). Treated as loss of voting right. Voter can report loss for audit trail |
 
 ### 4. Coercion and Vote Buying
 
-**Threat**: Voter is pressured to prove they voted for a specific candidate.
+**Threat**: Voter is pressured to prove they voted for a specific candidate, or sells their vote.
 
 **Countermeasures**:
 
 | Countermeasure | Implementation |
 |---|---|
-| Anonymous key destruction | QR2's private key is generated, used, and immediately destroyed within the terminal's secure environment (TEE). The voter never knows the anonymous key |
-| Irreversible link severance | ZK-based anonymization is one-way. The voter has no means to prove which anonymous token was theirs |
-| Physical isolation | Polling station terminals are air-gapped. Voting booth design physically prevents screen capture |
+| Physical QR exchange | QR1 → QR2 exchange at the station creates a physical break. Voter walks away without any proof of vote choice |
+| QR2 collection | QR2 is physically collected after voting (like a paper ballot in a ballot box). Voter cannot retain proof |
+| Anonymous key destruction | QR2's private key is generated and used within the terminal's secure environment (TEE). Destroyed after Vote TX |
+| Link severance | Physical: only the station sees QR1→QR2 mapping. Future ZK: on-chain link is cryptographically broken |
+| Booth isolation | Voting booth prevents screen capture. Terminal is air-gapped |
+| Vote buying futility | Buying QR1 is useless — the buyer cannot control the vote (QR2 is generated at the station with a fresh key) |
 
 ### 5. Polling Station Terminal Tampering
 
-**Threat**: A compromised terminal votes for a different candidate than the voter selected.
+**Threat**: A compromised terminal votes for a different candidate than the voter selected, or leaks the QR1→QR2 mapping.
 
 **Countermeasures**:
 
 | Countermeasure | Implementation |
 |---|---|
-| Confirmation screen | Display selection before TX broadcast. Show candidate address hash for verification |
-| Open-source terminal | Polling station software is publicly available for third-party audit |
-| Multi-terminal verification | Multiple independent terminals construct the TX; broadcast only if they agree |
-| Post-vote receipt | Print short hash of the voted candidate address for post-hoc verification (balanced against coercion concerns) |
+| Confirmation screen | Display candidate selection before Vote TX broadcast. Show candidate name and address hash |
+| Open-source terminal | All polling station software is publicly auditable. Hardware attestation via TEE |
+| Multi-terminal verification | Multiple independent terminals construct the TX; broadcast only if outputs match |
+| Log destruction | Station terminal destroys QR1→QR2 mapping logs after each voter's session. No persistent record |
+| Watchdog observers | Independent election observers can monitor terminal behavior and audit batch broadcasts |
 
 ### 6. Sybil Attack (Fake Voter Registration)
 
-**Threat**: Fictitious voters are added to the registry and included in the Merkle tree.
+**Threat**: Fictitious voters are added to the registry. Commission mails QR1 to fake addresses and uses them to cast fraudulent votes.
 
 **Countermeasures**:
 
 | Countermeasure | Implementation |
 |---|---|
 | Public registry audit | Voter registry (Merkle tree leaf count) is public. Cross-referenced with census data |
-| Integration with existing systems | Linked to national resident registry or national ID system; only verified individuals are registered |
-| Pre-election Merkle root publication | Merkle root published before voting begins. Voters can verify their own inclusion |
+| Integration with existing ID systems | Linked to national resident registry, national ID, or biometric database. Only verified individuals receive QR1 |
+| Pre-election Merkle root publication | Merkle root published before voting begins. Any voter can verify their own inclusion |
+| JIT cross-check | JIT Mint count per station vs. actual visitor count is auditable. Stations with anomalous mint-to-visitor ratios are flagged |
 
 ### 7. Network Attack (51% Attack)
 
-**Threat**: Attacker acquires majority hashrate on Kaspa network and alters vote TXs.
+**Threat**: Attacker acquires majority hashrate on Kaspa network and reverses or alters vote TXs.
 
 **Countermeasures**:
 
 | Countermeasure | Implementation |
 |---|---|
-| Kaspa's PoW + DAG resilience | DAG structure makes simple 51% attacks harder than on traditional blockchains |
-| Limited voting period | Short voting window limits the time available for an attacker to amass hashrate |
-| Finality confirmation | Wait for sufficient confirmations (DAG depth) before finalizing results |
-| Multi-layer verification | Cross-reference on-chain results with physical polling station logs |
+| Kaspa's PoW + DAG resilience | DAG structure makes 51% attacks significantly harder than on traditional blockchains |
+| Limited voting period | Short election window limits the time available for an attacker to amass hashrate |
+| Finality confirmation | Wait for sufficient DAG depth confirmations before finalizing results |
+| Multi-layer verification | Cross-reference on-chain results with physical polling station logs and parallel paper audit trail |
 
 ### 8. Privacy Leakage (Chain Analysis)
 
-**Threat**: Pattern analysis of vote TXs (amounts, fees, script sizes) could identify voters.
+**Threat**: Pattern analysis of vote TXs (amounts, fees, script sizes, timing) could fingerprint individual voters.
 
 **Countermeasures**:
 
 | Countermeasure | Implementation |
 |---|---|
-| Uniform TX structure | All vote TXs have identical value, fee, and script size. Eliminates pattern analysis vectors |
-| Fixed token amount | All tokens are uniformly TOKEN_VAL (v2: 0.1 KAS) |
-| Unified script | Anonymous token's script_public_key uses identical structure for all voters |
+| Uniform TX structure | All vote TXs have identical value (TOKEN_VAL), script size (KASTVote = 488 bytes for all voters), and structure |
+| Fixed token amount | All tokens are uniformly TOKEN_VAL (0.1 KAS). No amount-based fingerprinting |
+| Unified script | KASTVote contract is identical for all voters in one election (same constructor args = same bytecode) |
+| Batch broadcast | TXs are batched at the station, preventing timing-based fingerprinting |
+
+### 9. Aggregation Manipulation
+
+**Threat**: The election authority, who controls the aggregate function, could manipulate vote counts during real-time aggregation — dropping votes, delaying aggregation to cause deposit exhaustion, or selectively aggregating.
+
+**Countermeasures**:
+
+| Countermeasure | Implementation |
+|---|---|
+| Value preservation (on-chain) | KASTTally.aggregate enforces `output.value >= sum(input.values)` via covenant. The authority **cannot** reduce the total value — any attempt is rejected by consensus |
+| Covenant self-reference | Aggregated output must use the same KASTTally script (`this.activeBytecode`). Authority cannot redirect funds to a different address |
+| Pre-aggregation tally | Vote count is always verifiable pre-aggregation: count all covenant UTXOs at the candidate address. Aggregation is an optimization, not a requirement for counting |
+| Aggregation delay detection | If the authority delays aggregation, deposit runs low and JIT minting slows. This is publicly observable and triggers audit |
+| Independent aggregation audit | Any observer can verify every Aggregate TX: sum of inputs == output value, same covenant chain, same script. Anomalies are detectable |
+| Selective aggregation defense | Even if the authority only aggregates certain candidates, the raw UTXO count remains on-chain as ground truth. Aggregation cannot erase individual vote UTXOs — only consolidate them |
 
 ---
 
