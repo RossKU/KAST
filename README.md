@@ -459,7 +459,7 @@ Example: Voter A arrives at 14:30, on-chain shows Mint at 14:31, Anon at 14:32, 
 
 | Countermeasure | Implementation |
 |---|---|
-| Value preservation (on-chain) | KASTTally.aggregate enforces `output.value >= sum(input.values)` via covenant. The authority **cannot** reduce the total value — any attempt is rejected by consensus. **Note**: `>=` allows inflation via non-covenant inputs; v2.2 will tighten to `==` |
+| Value preservation (on-chain) | KASTTally.aggregate enforces `output.value == sum(input.values)` via covenant (v2.2). The authority **cannot** alter the total value — any attempt is rejected by consensus |
 | Covenant self-reference | Aggregated output must use the same KASTTally script (`this.activeBytecode`). Authority cannot redirect funds to a different address |
 | Pre-aggregation tally | Vote count is always verifiable pre-aggregation: count all covenant UTXOs at the candidate address. Aggregation is an optimization, not a requirement for counting |
 | Aggregation delay detection | If the authority delays aggregation, deposit runs low and JIT minting slows. This is publicly observable and triggers audit |
@@ -541,6 +541,32 @@ Example: Voter A arrives at 14:30, on-chain shows Mint at 14:31, Anon at 14:32, 
 | Off-chain audit | Every Mint TX output script is visible on-chain. Third-party auditors verify that all minted tokens are locked to KASTAnon scripts. Deviation is immediately detectable |
 | Station cross-reference | Each minted token is tied to a voter arrival (JIT model). Tokens minted to non-KASTAnon scripts have no corresponding voter session |
 | Covenant enforcement (future) | When Kaspa supports `OpTxOutputSpk` pattern matching in Mint scripts, the output destination can be enforced on-chain |
+
+### 16. Anonymization Output Script Not Enforced (Phase-Skip)
+
+**Threat**: KASTAnon.anonymize() enforces value, output count, and covenant chain — but does **not** verify `tx.outputs[0].lockingBytecode`. A compromised station terminal could route the anonymous token directly to a KASTTally script (specific candidate), bypassing KASTVote's candidate whitelist entirely. The voter's QR2 becomes unusable because the covenant UTXO is already consumed.
+
+**Countermeasures**:
+
+| Countermeasure | Implementation |
+|---|---|
+| Same countermeasures as Vector 5/10 | TEE, parallel paper ballot, Benaloh Challenge, multi-terminal consensus |
+| Voter detection | Voter discovers the attack when QR2 fails at Phase 3 (UTXO already spent). Station staff can flag the anomaly |
+| Off-chain audit | Every Anonymize TX output script is on-chain. Auditors verify all outputs are locked to KASTVote. Non-KASTVote outputs are immediately detectable |
+| Covenant enforcement (future) | `OpTxOutputSpk` pattern matching in KASTAnon would enforce output destination on-chain |
+
+### 17. Vote UTXO Front-Running (Unbound Anonymous Key)
+
+**Threat**: `KASTVote.vote(sig anonSig, pubkey anonPk)` accepts **any** valid key pair — `anonPk` is a runtime parameter, not bound to the UTXO. Anyone who observes an unspent KASTVote UTXO on-chain can create their own key pair, build a vote TX to their preferred candidate, and race the legitimate voter's TX. This is a **deliberate design trade-off**: binding `anonPk` into the constructor would give each voter a unique script, breaking KASTVote's uniformity (Vector 8 protection).
+
+**Countermeasures**:
+
+| Countermeasure | Implementation |
+|---|---|
+| Same-batch broadcast | Anonymize TX and Vote TX are broadcast in the same batch. The KASTVote UTXO is created and spent in the same block — no observation window |
+| Physical terminal flow | Terminal holds QR2 private key and constructs Vote TX immediately. Key is used before the Anonymize TX is even confirmed on-chain |
+| Kaspa high BPS | At 100 BPS, even if batches are split, the window between Anonymize confirmation and Vote broadcast is sub-second |
+| Encrypted voting (vProgs) | With encrypted vote TXs, an attacker cannot identify which UTXOs are KASTVote UTXOs without decryption |
 
 ---
 
@@ -737,9 +763,13 @@ Fee breakdown: Mint 30K (69%, dominated by storage mass) + Anon 10K + Vote 3K + 
 
 Security hardening (v2.1): exact value matching (`==` not `>=`) prevents fingerprinting, `recover` entrypoints prevent permanent deposit lock, `release` enforces covenant chain termination, and KASTReceipt is issued as a separate TX to preserve anonymization.
 
-**Open security items (v2.2)**:
-- `KASTTally.aggregate` uses `>=` for value preservation — election authority could inflate vote count by injecting non-covenant KAS into aggregate outputs. Fix: change to `==` so covenant output exactly matches covenant input sum.
-- `recover()` in KASTAnon/KASTVote lacks `OpCovOutCount(covId) == 0` — authority could create phantom covenant outputs during post-election recovery. Fix: add covenant termination check.
+**Security fixes (v2.2)**:
+- `KASTTally.aggregate`: `>=` → `==` for value preservation — prevents vote inflation via non-covenant KAS injection.
+- `recover()` in KASTAnon/KASTVote: added `OpCovOutCount(covId) == 0` — prevents phantom covenant output creation during post-election recovery.
+
+**Open design items (v2.2)**:
+- Output script not enforced at Mint (Vector 15) and Anonymize (Vector 16) phases — mitigated by off-chain audit; on-chain enforcement requires `OpTxOutputSpk`.
+- Vote UTXO front-running (Vector 17) — `anonPk` intentionally unbound for script uniformity; mitigated by same-batch broadcast and physical terminal flow.
 
 ---
 

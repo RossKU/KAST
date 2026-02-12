@@ -37,7 +37,7 @@ contract KASTTallyV2(pubkey candidatePk, pubkey electionAuthority, int electionE
     // ----------------------------------------------------------
     // Callable during election by election authority.
     // Takes up to MAX_AGG covenant inputs -> 1 covenant output.
-    // Value preservation enforced: output >= sum(all inputs).
+    // Value preservation enforced: output == sum(all inputs).
     // Output must use the same tally script (self-reference).
     // ----------------------------------------------------------
     entrypoint function aggregate(sig authSig) {
@@ -52,7 +52,7 @@ contract KASTTallyV2(pubkey candidatePk, pubkey electionAuthority, int electionE
         int outIdx = OpCovOutputIdx(covId, 0);
         require(tx.outputs[outIdx].lockingBytecode == this.activeBytecode);
 
-        // Value preservation: output >= sum of all covenant inputs
+        // Value preservation: output == sum of all covenant inputs
         int total = 0;
         for(i, 0, MAX_AGG) {
             if (i < OpCovInputCount(covId)) {
@@ -60,7 +60,7 @@ contract KASTTallyV2(pubkey candidatePk, pubkey electionAuthority, int electionE
                 total = total + tx.inputs[inIdx].value;
             }
         }
-        require(tx.outputs[outIdx].value >= total);
+        require(tx.outputs[outIdx].value == total);
     }
 
     // ----------------------------------------------------------

@@ -69,5 +69,9 @@ contract KASTAnonV2(pubkey voterPk, pubkey stationPk, pubkey electionAuthority, 
     entrypoint function recover(sig authSig) {
         require(checkSig(authSig, electionAuthority));
         require(tx.time >= electionEnd);
+
+        // Terminate covenant chain — prevent phantom UTXO creation
+        bytes covId = OpInputCovenantId(this.activeInputIndex);
+        require(OpCovOutCount(covId) == 0);
     }
 }

@@ -459,7 +459,7 @@ QR2用紙のデザイン:
 
 | 対策 | 実装方法 |
 |---|---|
-| 価値保全（オンチェーン） | KASTTally.aggregate は `output.value >= sum(input.values)` を Covenant で強制。選管は価値を減少させることが**不可能** — 試みはコンセンサスが拒否。**注意**: `>=` は非covenant入力による水増しを許容; v2.2 で `==` に厳格化予定 |
+| 価値保全（オンチェーン） | KASTTally.aggregate は `output.value == sum(input.values)` を Covenant で強制 (v2.2)。選管は合計値を変更することが**不可能** — 試みはコンセンサスが拒否 |
 | Covenant 自己参照 | 集約出力は同一 KASTTally スクリプト (`this.activeBytecode`) を使用しなければならない。選管が別アドレスに資金を流用することは不可能 |
 | 集約前の集計可能性 | 得票数は集約前でも常に検証可能: 候補者アドレスの全 covenant UTXO をカウント。集約は最適化であり、集計の必要条件ではない |
 | 集約遅延の検出 | 選管が集約を遅延させると預託が不足し JIT Mint が滞る。これは公開的に観測可能であり、監査のトリガーになる |
@@ -541,6 +541,32 @@ QR2用紙のデザイン:
 | オフチェーン監査 | 全 Mint TX の出力スクリプトはオンチェーンで可視。第三者監査人が全発行トークンが KASTAnon スクリプトにロックされていることを検証。逸脱は即座に検出可能 |
 | 投票所クロスチェック | 各 Mint トークンは投票者の来所に紐づく (JIT モデル)。KASTAnon 以外へ発行されたトークンは対応する投票者セッションが存在しない |
 | Covenant 強制（将来） | Kaspa が Mint スクリプト内の `OpTxOutputSpk` パターンマッチングをサポートすれば、出力先をオンチェーンで強制可能 |
+
+### 16. 匿名化出力スクリプト未強制（フェーズスキップ）
+
+**脅威**: KASTAnon.anonymize() は value、出力数、covenant chain を強制するが、`tx.outputs[0].lockingBytecode` を**検証しない**。改竄された投票所端末が匿名トークンを KASTTally スクリプト（特定候補者）に直接送信可能 — KASTVote の候補者ホワイトリストを完全に迂回。投票者の QR2 は covenant UTXO が既に消費されているため使用不能になる。
+
+**対策**:
+
+| 対策 | 実装方法 |
+|---|---|
+| ベクトル5/10と同一対策 | TEE、並走紙投票、Benaloh チャレンジ、多重端末合意 |
+| 投票者による検出 | Phase 3 で QR2 が失敗して攻撃を発見（UTXO 既使用）。投票所職員が異常をフラグ |
+| オフチェーン監査 | 全 Anonymize TX の出力スクリプトはオンチェーンで可視。監査人が全出力が KASTVote にロックされていることを検証。非 KASTVote 出力は即座に検出可能 |
+| Covenant 強制（将来） | KASTAnon 内の `OpTxOutputSpk` パターンマッチングで出力先をオンチェーン強制 |
+
+### 17. Vote UTXO フロントランニング（匿名鍵の非束縛）
+
+**脅威**: `KASTVote.vote(sig anonSig, pubkey anonPk)` は**任意の**有効な鍵ペアを受け入れる — `anonPk` はコンストラクタに含まれないランタイムパラメータ。オンチェーンで未使用の KASTVote UTXO を観察した攻撃者が、自分の鍵ペアで投票 TX を構築し、正規の投票者と競争できる。これは**意図的な設計トレードオフ**: `anonPk` をコンストラクタに含めると各投票者のスクリプトが異なり、KASTVote の均一性（ベクトル8の保護）が崩れる。
+
+**対策**:
+
+| 対策 | 実装方法 |
+|---|---|
+| 同一バッチ送信 | Anonymize TX と Vote TX を同一バッチで送信。KASTVote UTXO の生成と使用が同一ブロック内で完結 — 観察窓なし |
+| 物理端末フロー | 端末が QR2 秘密鍵を保持し即座に Vote TX を構築。Anonymize TX がオンチェーン確認される前に鍵は使用済み |
+| Kaspa 高 BPS | 100 BPS では、バッチが分割されても Anonymize 確認から Vote 送信までの窓はサブ秒 |
+| 暗号化投票 (vProgs) | 暗号化された Vote TX では、攻撃者は復号なしにどの UTXO が KASTVote か識別不能 |
 
 ---
 
@@ -739,9 +765,13 @@ KAST では 1 投票者あたり 3 TX（Mint + 匿名化 + 投票; Mint は最�
 
 セキュリティ強化 (v2.1): value 完全一致 (`==`) でフィンガープリント防止、`recover` で未使用トークンの預託回収、`release` で covenant chain 終端を強制、KASTReceipt は匿名化を保護するため独立TX発行に変更。
 
-**未解決セキュリティ項目 (v2.2)**:
-- `KASTTally.aggregate` の value 保全が `>=` — 選管が非covenant KAS を aggregate 出力に混入して得票数を水増し可能。修正: `==` に変更し、covenant 出力が covenant 入力合計と完全一致を強制。
-- `recover()` (KASTAnon/KASTVote) に `OpCovOutCount(covId) == 0` がない — 選管が選挙後の回収時にファントム covenant 出力を作成可能。修正: covenant 終端チェックを追加。
+**セキュリティ修正 (v2.2)**:
+- `KASTTally.aggregate`: `>=` → `==` で value 保全 — 非covenant KAS 混入による得票水増しを防止。
+- `recover()` (KASTAnon/KASTVote): `OpCovOutCount(covId) == 0` を追加 — 選挙後回収時のファントム covenant 出力生成を防止。
+
+**未解決設計項目 (v2.2)**:
+- Mint (ベクトル15) と Anonymize (ベクトル16) の出力スクリプト未強制 — オフチェーン監査で緩和; オンチェーン強制には `OpTxOutputSpk` が必要。
+- Vote UTXO フロントランニング (ベクトル17) — スクリプト均一性のため `anonPk` は意図的に非束縛; 同一バッチ送信と物理端末フローで緩和。
 
 ---
 
