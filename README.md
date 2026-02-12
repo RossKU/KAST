@@ -568,6 +568,20 @@ Example: Voter A arrives at 14:30, on-chain shows Mint at 14:31, Anon at 14:32, 
 | Kaspa high BPS | At 100 BPS, even if batches are split, the window between Anonymize confirmation and Vote broadcast is sub-second |
 | Encrypted voting (vProgs) | With encrypted vote TXs, an attacker cannot identify which UTXOs are KASTVote UTXOs without decryption |
 
+### 18. Benaloh Challenge Selective Honesty
+
+**Threat**: A compromised terminal behaves honestly only when challenged, and substitutes votes when not challenged. The standard Benaloh Challenge relies on voters voluntarily challenging — but challenge rates may be very low in practice (smartphone literacy barrier, elderly voters). A terminal could also profile voters and selectively cheat on those unlikely to challenge.
+
+**Note**: This vector is largely mitigated by KAST's parallel paper ballot, which provides deterministic post-election detection independent of Benaloh. The improvements below are proposals for strengthening the real-time detection layer.
+
+**Countermeasures**:
+
+| Countermeasure | Implementation |
+|---|---|
+| Parallel paper ballot (existing) | Voter's handwritten candidate on QR2 paper provides 100% post-election detection — not statistical. Benaloh is a supplementary real-time layer |
+| System-Initiated Random Challenge (SIRC, proposal) | Replace voter-initiated challenge with system-driven: terminal commits to encrypted vote, then Kaspa block hash (unpredictable at commitment time) determines whether this is a forced challenge. Challenge rate is fixed and uniform — terminal cannot predict or selectively cheat |
+| ZK proof of correct encryption (vProgs, proposal) | Terminal outputs encrypted vote + ZK proof of encryption correctness. Every vote is deterministically verified — no challenge needed. Requires vProgs for on-chain proof verification |
+
 ---
 
 ## Physical-Digital Audit
