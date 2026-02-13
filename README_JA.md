@@ -831,7 +831,7 @@ KAST では 1 投票者あたり 3 TX（Mint + 匿名化 + 投票; Mint は最�
 
 ## 実装状況
 
-コントラクトは [SilverScript](https://github.com/aspect-build/silverscript) で記述し、`silverc` でコンパイル済み。ソースとバイトコードは本リポジトリに格納。
+コントラクトは [SilverScript](https://github.com/kaspanet/silverscript) で記述し、`silverc` でコンパイル済み。ソースとバイトコードは本リポジトリに格納。
 
 ### コンパイル済みコントラクト
 

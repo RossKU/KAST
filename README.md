@@ -829,7 +829,7 @@ Censorship resistance is the highest-priority requirement for election systems, 
 
 ## Implementation Status
 
-Contracts are written in [SilverScript](https://github.com/aspect-build/silverscript) and compiled with `silverc`. Full source and bytecodes are in this repository.
+Contracts are written in [SilverScript](https://github.com/kaspanet/silverscript) and compiled with `silverc`. Full source and bytecodes are in this repository.
 
 ### Compiled Contracts
 
